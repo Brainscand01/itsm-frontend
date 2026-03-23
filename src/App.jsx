@@ -43,11 +43,13 @@ const PRIO0 = [
   { id:"p4", label:"P4 - Low",      color:"#16A34A", responseMin:240, resolveMin:2880 },
 ];
 const STATUS0 = [
-  { id:"s1", label:"Open",        color:"#DC2626", bg:"#FEF2F2" },
-  { id:"s2", label:"In Progress", color:"#1D6FAF", bg:"#EFF6FF" },
-  { id:"s3", label:"Pending",     color:"#D97706", bg:"#FFFBEB" },
-  { id:"s4", label:"Resolved",    color:"#16A34A", bg:"#F0FDF4" },
-  { id:"s5", label:"Closed",      color:"#8A99A8", bg:"#F1F5F9" },
+  { id:"s1", label:"Open",                    color:"#DC2626", bg:"#FEF2F2" },
+  { id:"s2", label:"In Progress",             color:"#1D6FAF", bg:"#EFF6FF" },
+  { id:"s3", label:"Pending User Feedback",   color:"#D97706", bg:"#FFFBEB" },
+  { id:"s4", label:"User Feedback Received",  color:"#7C3AED", bg:"#F5F3FF" },
+  { id:"s5", label:"Reopened",                color:"#F4801A", bg:"#FFF7ED" },
+  { id:"s6", label:"Resolved",                color:"#16A34A", bg:"#F0FDF4" },
+  { id:"s7", label:"Closed",                  color:"#8A99A8", bg:"#F1F5F9" },
 ];
 const ROLES0 = [
   { id:"r1", name:"Service Desk Agent",    level:"L1",    cats:["Software","Email"] },
@@ -85,7 +87,7 @@ const TIX0 = [
   { id:"TKT-1001", title:"Outlook not syncing emails",        cat:"Email",                    pri:"P2 - High",    st:"Open",        user:"John Smith",    mac:"PC-JSmith-001",   ip:"192.168.1.42", asgn:"Alice Naidoo",  cls:"Email Issue",                    grp:"Incident", created:new Date(now0-7200000).toISOString(),   logs:"", notes:[], internalNotes:[] },
   { id:"TKT-1002", title:"Cannot access shared drive Z:",     cat:"Network",                  pri:"P3 - Medium",  st:"In Progress", user:"Mary Dlamini",  mac:"PC-MDlamini-003", ip:"192.168.1.55", asgn:"Brian Mokoena", cls:"Network / Connectivity Issue",   grp:"Incident", created:new Date(now0-18000000).toISOString(),  logs:"", notes:[], internalNotes:[] },
   { id:"TKT-1003", title:"BSOD - KERNEL_DATA_INPAGE_ERROR",   cat:"Hardware",                 pri:"P1 - Critical",st:"Open",        user:"Sipho Khumalo", mac:"PC-SKhumalo-007", ip:"192.168.1.88", asgn:"Carol Singh",   cls:"Hardware Failure",               grp:"Incident", created:new Date(now0-3600000).toISOString(),   logs:"Event ID 41\nEvent ID 1001", notes:[], internalNotes:[] },
-  { id:"TKT-1004", title:"Request new laptop - Dell XPS 15",  cat:"Hardware",                 pri:"P4 - Low",     st:"Pending",     user:"Thabo Moyo",    mac:"N/A",             ip:"N/A",          asgn:"Dev Pillay",    cls:"New Equipment Request",          grp:"Request",  created:new Date(now0-86400000).toISOString(),  logs:"", notes:[], internalNotes:[] },
+  { id:"TKT-1004", title:"Request new laptop - Dell XPS 15",  cat:"Hardware",                 pri:"P4 - Low",     st:"Pending User Feedback",     user:"Thabo Moyo",    mac:"N/A",             ip:"N/A",          asgn:"Dev Pillay",    cls:"New Equipment Request",          grp:"Request",  created:new Date(now0-86400000).toISOString(),  logs:"", notes:[], internalNotes:[] },
   { id:"TKT-1005", title:"Account locked out",                cat:"Access / Permissions",     pri:"P2 - High",    st:"Resolved",    user:"Priya Nair",    mac:"PC-PNair-002",    ip:"192.168.1.70", asgn:"Alice Naidoo",  cls:"Password Reset / Account Lockout",grp:"Incident", created:new Date(now0-172800000).toISOString(), logs:"", notes:[], internalNotes:[] },
   { id:"TKT-1006", title:"Install Adobe Acrobat Pro",         cat:"Software",                 pri:"P3 - Medium",  st:"Open",        user:"Lee Wessels",   mac:"PC-LWessels-005", ip:"192.168.1.90", asgn:"",              cls:"Software Installation",          grp:"Request",  created:new Date(now0-10800000).toISOString(),  logs:"", notes:[], internalNotes:[] },
   { id:"TKT-1007", title:"VPN keeps dropping connection",     cat:"Network",                  pri:"P2 - High",    st:"Open",        user:"Nomsa Dube",    mac:"PC-NDube-008",    ip:"192.168.1.22", asgn:"",              cls:"Network / Connectivity Issue",   grp:"Incident", created:new Date(now0-5400000).toISOString(),   logs:"", notes:[], internalNotes:[] },
@@ -154,12 +156,32 @@ const getSlaInfo = (tk, clsList, prioList) => {
   const resolveMin  = p ? p.resolveMin  : (c ? c.resolveMin  : null);
   const source = p ? "priority" : "classification";
   if (!resolveMin) return null;
-  const el  = elMin(tk.created);
-  const pct = Math.min(100, Math.round(el / resolveMin * 100));
-  if (["Resolved","Closed"].includes(tk.st)) return { pct:100, label:"Resolved",  color:C.grn, responseMin, resolveMin, source };
-  if (el >= resolveMin)                       return { pct:100, label:"Breached",  color:C.red, responseMin, resolveMin, source };
-  if (pct >= 75)                              return { pct,     label:"At risk",   color:C.yel, responseMin, resolveMin, source };
-  return                                             { pct,     label:"On track",  color:C.grn, responseMin, resolveMin, source };
+
+  const pausedMin = tk.total_paused_minutes || 0;
+  const st = tk.st || tk.status || "";
+  const isPaused = st === "Pending User Feedback";
+
+  // Resolved/Closed: measure Open → resolved_at minus paused time
+  if (tk.resolved_at && ["Resolved","Closed"].includes(st)) {
+    const totalMin = Math.floor((new Date(tk.resolved_at).getTime() - new Date(tk.created || tk.created_at).getTime()) / 60000);
+    const activeMin = Math.max(0, totalMin - pausedMin);
+    return { pct:100, label:"Resolved", color:C.grn, responseMin, resolveMin, source, activeMin, pausedMin, isPaused:false, resolvedAt:tk.resolved_at };
+  }
+
+  // Active ticket: elapsed minus paused time
+  const totalElapsed = elMin(tk.created || tk.created_at);
+  let currentPauseMin = 0;
+  if (isPaused && tk.paused_at) {
+    currentPauseMin = Math.floor((Date.now() - new Date(tk.paused_at).getTime()) / 60000);
+  }
+  const activeMin = Math.max(0, totalElapsed - pausedMin - currentPauseMin);
+  const pct = Math.min(100, Math.round(activeMin / resolveMin * 100));
+  const remainMin = Math.max(0, resolveMin - activeMin);
+
+  if (isPaused) return { pct, label:"SLA Paused", color:C.yel, responseMin, resolveMin, source, activeMin, pausedMin:pausedMin+currentPauseMin, isPaused:true, remainMin };
+  if (activeMin >= resolveMin) return { pct:100, label:"Breached", color:C.red, responseMin, resolveMin, source, activeMin, pausedMin, isPaused:false, remainMin:0 };
+  if (pct >= 75) return { pct, label:"At risk", color:C.yel, responseMin, resolveMin, source, activeMin, pausedMin, isPaused:false, remainMin };
+  return { pct, label:"On track", color:C.grn, responseMin, resolveMin, source, activeMin, pausedMin, isPaused:false, remainMin };
 };
 
 // ── Tiny components ──────────────────────────────────────────
@@ -953,41 +975,47 @@ export default function App() {
                       <div><div style={{fontSize:12,color:C.t3,marginBottom:4,fontWeight:500}}>{t.id} \u00B7 <span style={{color:t.grp==="Incident"?C.redT:C.bluT,fontWeight:600}}>{t.grp}</span></div><div style={{fontWeight:700,fontSize:16}}>{t.title}</div></div>
                       <div style={{display:"flex",gap:6}}><Bdg label={t.pri} bg={po.color+"22"} fg={po.color}/><Bdg label={so.label} bg={so.bg} fg={so.color}/></div>
                     </div>
-                    {s && (
-                      <div style={{marginBottom:14,padding:"12px 14px",background:s.label==="Breached"?C.redBg:s.label==="At risk"?C.yelBg:C.grnBg,borderRadius:8,border:"1px solid "+s.color+"33"}}>
+                    {s && (()=>{
+                      const createdTs = t.created || t.created_at;
+                      const pausedTotal = s.pausedMin || 0;
+                      const deadline = new Date(new Date(createdTs).getTime() + (s.resolveMin + pausedTotal) * 60000);
+                      const remainMs = deadline.getTime() - Date.now();
+                      const overdue = remainMs < 0 && !["Resolved","Closed"].includes(t.st);
+                      const bgCol = s.isPaused ? C.yelBg : s.label==="Breached" ? C.redBg : s.label==="At risk" ? C.yelBg : C.grnBg;
+                      return (
+                      <div style={{marginBottom:14,padding:"12px 14px",background:bgCol,borderRadius:8,border:"1px solid "+s.color+"33"}}>
                         <div style={{display:"flex",justifyContent:"space-between",marginBottom:6,fontSize:12}}>
-                          <span style={{fontWeight:700,color:s.color}}>SLA: {s.label}</span>
-                          <Bdg label={s.source==="priority"?"Priority override":"Classification SLA"} bg={s.source==="priority"?C.yelBg:C.bluBg} fg={s.source==="priority"?C.yelT:C.bluT}/>
-                        </div>
-                        <Bar pct={s.pct} color={s.color}/>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:10,fontSize:12}}>
-                          <div style={{padding:"6px 10px",background:"rgba(255,255,255,0.6)",borderRadius:6}}><div style={{color:C.t3,fontSize:11,marginBottom:2}}>Response SLA</div><div style={{fontWeight:600}}>{fmtMin(s.responseMin)}</div></div>
-                          <div style={{padding:"6px 10px",background:"rgba(255,255,255,0.6)",borderRadius:6}}><div style={{color:C.t3,fontSize:11,marginBottom:2}}>Resolve SLA</div><div style={{fontWeight:600}}>{fmtMin(s.resolveMin)}</div></div>
-                          <div style={{padding:"6px 10px",background:"rgba(255,255,255,0.6)",borderRadius:6,gridColumn:"1/-1"}}>
-                            <div style={{color:C.t3,fontSize:11,marginBottom:4}}>Resolve deadline</div>
-                            {(()=>{
-                              const deadline = new Date(new Date(t.created).getTime() + s.resolveMin * 60000);
-                              const remainMs = deadline.getTime() - Date.now();
-                              const remainMin = Math.max(0, Math.ceil(remainMs / 60000));
-                              const bucket = Math.ceil(remainMin / 30) * 30;
-                              const overdue = remainMs < 0;
-                              return (
-                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
-                                  <div>
-                                    <div style={{fontWeight:600,fontSize:13}}>{deadline.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"})} at {deadline.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"})}</div>
-                                    <div style={{fontSize:11,color:C.t3,marginTop:2}}>Created {new Date(t.created).toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"})}</div>
-                                  </div>
-                                  <div style={{textAlign:"right"}}>
-                                    <div style={{fontWeight:700,fontSize:13,color:overdue?C.red:bucket<=30?C.yel:s.color}}>{overdue?"Overdue by "+fmtMin(Math.abs(Math.ceil(remainMs/60000))):"\u223C"+fmtMin(bucket)+" remaining"}</div>
-                                    <div style={{fontSize:11,color:C.t3,marginTop:2}}>{overdue?"Breach exceeded":"Next 30-min bucket"}</div>
-                                  </div>
-                                </div>
-                              );
-                            })()}
+                          <span style={{fontWeight:700,color:s.color}}>SLA: {s.label}{s.isPaused?" \u23F8":""}</span>
+                          <div style={{display:"flex",gap:6}}>
+                            {pausedTotal>0 && <Bdg label={"Paused: "+fmtMin(pausedTotal)} bg={C.yelBg} fg={C.yelT} xstyle={{fontSize:10}}/>}
+                            <Bdg label={s.source==="priority"?"Priority override":"Classification SLA"} bg={s.source==="priority"?C.yelBg:C.bluBg} fg={s.source==="priority"?C.yelT:C.bluT}/>
                           </div>
                         </div>
-                      </div>
-                    )}
+                        <Bar pct={s.pct} color={s.color}/>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginTop:10,fontSize:12}}>
+                          <div style={{padding:"6px 10px",background:"rgba(255,255,255,0.6)",borderRadius:6}}><div style={{color:C.t3,fontSize:11,marginBottom:2}}>Response SLA</div><div style={{fontWeight:600}}>{fmtMin(s.responseMin)}</div></div>
+                          <div style={{padding:"6px 10px",background:"rgba(255,255,255,0.6)",borderRadius:6}}><div style={{color:C.t3,fontSize:11,marginBottom:2}}>Resolve SLA</div><div style={{fontWeight:600}}>{fmtMin(s.resolveMin)}</div></div>
+                          <div style={{padding:"6px 10px",background:"rgba(255,255,255,0.6)",borderRadius:6}}>
+                            <div style={{color:C.t3,fontSize:11,marginBottom:2}}>Time remaining</div>
+                            <div style={{fontWeight:700,color:overdue?C.red:s.isPaused?C.yel:s.remainMin!=null&&s.remainMin<=60?C.yel:s.color}}>
+                              {s.label==="Resolved"?"Completed":s.isPaused?"Paused":overdue?"Overdue "+fmtMin(Math.abs(Math.ceil(remainMs/60000))):"\u223C"+fmtMin(s.remainMin||0)}
+                            </div>
+                          </div>
+                          <div style={{padding:"6px 10px",background:"rgba(255,255,255,0.6)",borderRadius:6}}>
+                            <div style={{color:C.t3,fontSize:11,marginBottom:2}}>Resolved at</div>
+                            <div style={{fontWeight:600}}>{s.resolvedAt?new Date(s.resolvedAt).toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"--"}</div>
+                          </div>
+                        </div>
+                        <div style={{marginTop:8,padding:"6px 10px",background:"rgba(255,255,255,0.6)",borderRadius:6,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:12}}>
+                          <div>
+                            <div style={{color:C.t3,fontSize:11,marginBottom:2}}>Resolve deadline</div>
+                            <div style={{fontWeight:600,fontSize:13}}>{deadline.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"})} at {deadline.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"})}</div>
+                            <div style={{fontSize:11,color:C.t3,marginTop:2}}>Created {new Date(createdTs).toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"})}{pausedTotal>0?" \u00B7 "+fmtMin(pausedTotal)+" paused":""}</div>
+                          </div>
+                          {s.activeMin!=null && <div style={{textAlign:"right",fontSize:11,color:C.t2}}>Active time: <strong>{fmtMin(s.activeMin)}</strong></div>}
+                        </div>
+                      </div>);
+                    })()}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,fontSize:13}}>
                       {[["User",t.user],["Machine",t.mac],["IP",t.ip],["Category",t.cat],["Created",new Date(t.created).toLocaleString()],["Classification",t.cls||"\u2014"]].map(kv=>(
                         <div key={kv[0]} style={{padding:"8px 12px",background:C.bg,borderRadius:8}}><span style={{color:C.t3,fontSize:11,fontWeight:500,display:"block",marginBottom:2}}>{kv[0]}</span><span style={{fontWeight:500}}>{kv[1]}</span></div>
@@ -1540,6 +1568,33 @@ export default function App() {
                   <div>
                     <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Priority Types & SLA</div>
                     <div style={{fontSize:13,color:C.t2,marginBottom:16}}>When a ticket has a priority set, these SLA times override the classification SLA.</div>
+                    <Crd xstyle={{marginBottom:20,borderLeft:"4px solid "+C.blu,background:C.bluBg}}>
+                      <div style={{fontWeight:700,fontSize:14,color:C.bluT,marginBottom:10}}>SLA Calculation Rules</div>
+                      <div style={{fontSize:13,color:C.t1,lineHeight:1.8}}>
+                        <div style={{fontWeight:600,marginBottom:4}}>How SLA is measured:</div>
+                        <ul style={{paddingLeft:18,marginBottom:12}}>
+                          <li>SLA timer <strong>starts</strong> when a ticket is created (status: Open)</li>
+                          <li>SLA timer <strong>runs</strong> through: Open, In Progress, User Feedback Received, Reopened</li>
+                          <li>SLA timer <strong>pauses</strong> when status is set to "Pending User Feedback"</li>
+                          <li>SLA timer <strong>resumes</strong> when status changes from "Pending User Feedback" to any active status</li>
+                          <li>SLA timer <strong>stops</strong> when ticket is marked as "Resolved"</li>
+                          <li><strong>Total SLA</strong> = (Resolved time - Created time) - Total paused time</li>
+                        </ul>
+                        <div style={{fontWeight:600,marginBottom:4}}>Status transitions:</div>
+                        <ul style={{paddingLeft:18,marginBottom:12}}>
+                          <li>Open &rarr; In Progress &rarr; Resolved <em>(standard flow)</em></li>
+                          <li>Any status &rarr; Pending User Feedback <em>(SLA pauses)</em></li>
+                          <li>Pending User Feedback &rarr; User Feedback Received <em>(SLA resumes)</em></li>
+                          <li>Resolved &rarr; Reopened <em>(new SLA cycle, timer resets)</em></li>
+                          <li>Resolved &rarr; Closed <em>(auto after 24h with no user response)</em></li>
+                        </ul>
+                        <div style={{fontWeight:600,marginBottom:4}}>SLA targets determined by:</div>
+                        <ol style={{paddingLeft:18}}>
+                          <li><strong>Priority level</strong> (if set) &mdash; takes precedence</li>
+                          <li><strong>Classification type</strong> (fallback if no priority set)</li>
+                        </ol>
+                      </div>
+                    </Crd>
                     {prios.map(p=>(
                       <Crd key={p.id} xstyle={{marginBottom:12,borderLeft:"3px solid "+p.color}}>
                         {ePrio===p.id ? (
