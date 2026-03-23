@@ -394,6 +394,7 @@ export default function App() {
   const [eTech,setETech]       = useState(null); const [addTech,setAddTech] = useState(false);
   const [techF,setTechF]       = useState({ name:"", roleId:"r1", email:"", catsOverride:null, maxTix:5, autoAssign:true });
   const [eMon,setEMon]         = useState(null); const [addMon,setAddMon] = useState(false);
+  const [userMenu, setUserMenu] = useState(false);
   const [monF,setMonF]         = useState({ name:"", type:"http", target:"" });
 
   const chatEnd = useRef(null);
@@ -763,13 +764,41 @@ export default function App() {
             );
           })}
         </nav>
-        <div style={{borderTop:"1px solid "+C.navyBorder,padding:"12px 10px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-          <div style={{width:32,height:32,borderRadius:"50%",background:C.orange,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff",flexShrink:0}}>{(curUser?.name||"U")[0]}</div>
-          {sideOpen && <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{curUser?.name||"User"}</div>
-            <div style={{fontSize:11,color:C.orange,fontWeight:500}}>{curUser?.role||"Tech"}</div>
+        <div style={{borderTop:"1px solid "+C.navyBorder,padding:"12px 10px",position:"relative",flexShrink:0}}>
+          <div onClick={()=>setUserMenu(!userMenu)} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",borderRadius:8,padding:"4px 2px",transition:"background 0.15s"}}
+            onMouseEnter={e=>e.currentTarget.style.background=C.navyMid} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+            <div style={{width:32,height:32,borderRadius:"50%",background:C.orange,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff",flexShrink:0}}>{(curUser?.name||"U")[0]}</div>
+            {sideOpen && <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{curUser?.name||"User"}</div>
+              <div style={{fontSize:11,color:C.orange,fontWeight:500}}>{curUser?.role||"Tech"}</div>
+            </div>}
+          </div>
+          {userMenu && <div style={{position:"absolute",bottom:"100%",left:sideOpen?10:50,marginBottom:8,background:C.card,border:"1px solid "+C.border,borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,0.15)",width:260,zIndex:999,overflow:"hidden"}}>
+            <div style={{padding:"16px 16px 12px",borderBottom:"1px solid "+C.border}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:40,height:40,borderRadius:"50%",background:C.orange,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:"#fff",flexShrink:0}}>{(curUser?.name||"U")[0]}</div>
+                <div>
+                  <div style={{fontSize:14,fontWeight:600,color:C.t1}}>{curUser?.name||"User"}</div>
+                  <div style={{fontSize:12,color:C.t2}}>{curUser?.email||""}</div>
+                </div>
+              </div>
+              <div style={{marginTop:10,display:"flex",gap:6}}>
+                <span style={{background:C.orange+"18",color:C.orange,fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{curUser?.role||"Tech"}</span>
+              </div>
+            </div>
+            <div style={{padding:6}}>
+              <div onClick={()=>{setUserMenu(false);setTab("settings");}} style={{padding:"9px 12px",borderRadius:8,cursor:"pointer",fontSize:13,color:C.t1,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background=C.bg} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <svg width="14" height="14" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.5"/><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                Settings
+              </div>
+              <div style={{height:1,background:C.border,margin:"4px 8px"}} />
+              <div onClick={logout} style={{padding:"9px 12px",borderRadius:8,cursor:"pointer",fontSize:13,color:C.red,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background=C.redBg} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                <svg width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M6 15H4a1 1 0 01-1-1V4a1 1 0 011-1h2M12 12l3-3-3-3M7 9h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                Sign Out
+              </div>
+            </div>
           </div>}
-          {sideOpen && <span onClick={logout} title="Sign out" style={{cursor:"pointer",color:C.t3,fontSize:11,padding:"4px 8px",borderRadius:6,background:"rgba(255,255,255,0.08)"}}>&times;</span>}
+          {userMenu && <div onClick={()=>setUserMenu(false)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:998}} />}
         </div>
       </div>
 
