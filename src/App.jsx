@@ -395,6 +395,10 @@ export default function App() {
   const [techF,setTechF]       = useState({ name:"", roleId:"r1", email:"", catsOverride:null, maxTix:5, autoAssign:true });
   const [eMon,setEMon]         = useState(null); const [addMon,setAddMon] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
+  const [scripts, setScripts] = useState(SCRIPTS);
+  const [addScript, setAddScript] = useState(false);
+  const [scriptForm, setScriptForm] = useState({ name:"", cmd:"", desc:"" });
+  const [scriptDetail, setScriptDetail] = useState(null);
   const [monF,setMonF]         = useState({ name:"", type:"http", target:"" });
 
   const chatEnd = useRef(null);
@@ -764,7 +768,7 @@ export default function App() {
             );
           })}
         </nav>
-        <div style={{borderTop:"1px solid "+C.navyBorder,padding:"12px 10px",position:"relative",flexShrink:0}}>
+        <div style={{borderTop:"1px solid "+C.navyBorder,padding:"12px 10px",flexShrink:0}}>
           <div onClick={()=>setUserMenu(!userMenu)} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",borderRadius:8,padding:"4px 2px",transition:"background 0.15s"}}
             onMouseEnter={e=>e.currentTarget.style.background=C.navyMid} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
             <div style={{width:32,height:32,borderRadius:"50%",background:C.orange,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff",flexShrink:0}}>{(curUser?.name||"U")[0]}</div>
@@ -773,33 +777,39 @@ export default function App() {
               <div style={{fontSize:11,color:C.orange,fontWeight:500}}>{curUser?.role||"Tech"}</div>
             </div>}
           </div>
-          {userMenu && <div style={{position:"absolute",bottom:"100%",left:sideOpen?10:50,marginBottom:8,background:C.card,border:"1px solid "+C.border,borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,0.15)",width:260,zIndex:999,overflow:"hidden"}}>
-            <div style={{padding:"16px 16px 12px",borderBottom:"1px solid "+C.border}}>
-              <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:40,height:40,borderRadius:"50%",background:C.orange,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:"#fff",flexShrink:0}}>{(curUser?.name||"U")[0]}</div>
+        </div>
+        {userMenu && <>
+          <div onClick={()=>setUserMenu(false)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:9998}} />
+          <div style={{position:"fixed",bottom:70,left:sideOpen?16:56,background:C.card,border:"1px solid "+C.border,borderRadius:12,boxShadow:"0 8px 32px rgba(0,0,0,0.2)",width:280,zIndex:9999}}>
+            <div style={{padding:"20px 16px 14px",borderBottom:"1px solid "+C.border}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+                <div style={{width:48,height:48,borderRadius:"50%",background:C.orange,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"#fff",flexShrink:0}}>{(curUser?.name||"U").split(" ").map(w=>w[0]).join("")}</div>
                 <div>
-                  <div style={{fontSize:14,fontWeight:600,color:C.t1}}>{curUser?.name||"User"}</div>
-                  <div style={{fontSize:12,color:C.t2}}>{curUser?.email||""}</div>
+                  <div style={{fontSize:15,fontWeight:600,color:C.t1}}>{curUser?.name||"User"}</div>
+                  <div style={{fontSize:12,color:C.t2,marginTop:2}}>{curUser?.email||""}</div>
                 </div>
               </div>
-              <div style={{marginTop:10,display:"flex",gap:6}}>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 <span style={{background:C.orange+"18",color:C.orange,fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{curUser?.role||"Tech"}</span>
+                <span style={{background:C.bluBg,color:C.bluT,fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20}}>{curUser?.id ? "ID: "+curUser.id.slice(0,8) : ""}</span>
               </div>
             </div>
-            <div style={{padding:6}}>
+            <div style={{padding:"8px 8px 4px"}}>
+              <div style={{padding:"4px 10px",fontSize:11,fontWeight:600,color:C.t3,textTransform:"uppercase",letterSpacing:"0.5px"}}>Account</div>
               <div onClick={()=>{setUserMenu(false);setTab("settings");}} style={{padding:"9px 12px",borderRadius:8,cursor:"pointer",fontSize:13,color:C.t1,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background=C.bg} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <svg width="14" height="14" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.5"/><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                 Settings
               </div>
-              <div style={{height:1,background:C.border,margin:"4px 8px"}} />
+            </div>
+            <div style={{padding:"0 8px 8px"}}>
+              <div style={{height:1,background:C.border,margin:"0 4px 6px"}} />
               <div onClick={logout} style={{padding:"9px 12px",borderRadius:8,cursor:"pointer",fontSize:13,color:C.red,display:"flex",alignItems:"center",gap:8}} onMouseEnter={e=>e.currentTarget.style.background=C.redBg} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                 <svg width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M6 15H4a1 1 0 01-1-1V4a1 1 0 011-1h2M12 12l3-3-3-3M7 9h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 Sign Out
               </div>
             </div>
-          </div>}
-          {userMenu && <div onClick={()=>setUserMenu(false)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:998}} />}
-        </div>
+          </div>
+        </>}
       </div>
 
       {/* MAIN */}
@@ -1054,7 +1064,7 @@ export default function App() {
                   </Crd>
                   <Crd>
                     <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>Quick scripts</div>
-                    {SCRIPTS.slice(0,4).map(sc=>(
+                    {scripts.slice(0,4).map(sc=>(
                       <div key={sc.id} style={{padding:"8px 0",borderBottom:"1px solid "+C.border}}>
                         <div style={{fontSize:13,fontWeight:600,marginBottom:2}}>{sc.name}</div>
                         <div style={{fontSize:12,color:C.t2,marginBottom:6}}>{sc.desc}</div>
@@ -1324,14 +1334,41 @@ export default function App() {
           {/* ── SCRIPTS ── */}
           {!loading && tab==="scripts" && (
             <div>
-              <div style={{fontWeight:700,fontSize:16,marginBottom:16}}>Self-heal scripts</div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                <div><div style={{fontWeight:700,fontSize:16,marginBottom:4}}>Self-heal scripts</div><div style={{fontSize:13,color:C.t2}}>Automation scripts for remote remediation. AI can use these in automated workflows.</div></div>
+                <button className="btn btp" onClick={()=>{setAddScript(true);setScriptForm({name:"",cmd:"",desc:""});}}>+ Add Script</button>
+              </div>
+              {addScript && <Crd xstyle={{marginBottom:16,borderTop:"3px solid "+C.orange}}>
+                <div style={{fontWeight:600,marginBottom:12}}>New Automation Script</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                  <div><Lbl text="Script Name"/><input value={scriptForm.name} onChange={e=>setScriptForm(p=>({...p,name:e.target.value}))} placeholder="e.g. Clear Print Queue"/></div>
+                  <div><Lbl text="Command"/><input value={scriptForm.cmd} onChange={e=>setScriptForm(p=>({...p,cmd:e.target.value}))} placeholder="e.g. net stop spooler && del /q %systemroot%\system32\spool\printers\* && net start spooler"/></div>
+                </div>
+                <div style={{marginBottom:12}}><Lbl text="Description (what it does — used by AI for automation decisions)"/><textarea style={{minHeight:60}} value={scriptForm.desc} onChange={e=>setScriptForm(p=>({...p,desc:e.target.value}))} placeholder="Describe what this script does, when to use it, and any risks or prerequisites..."/></div>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="btn btp sm" disabled={!scriptForm.name||!scriptForm.cmd} onClick={()=>{setScripts(p=>[...p,{id:Date.now(),name:scriptForm.name,cmd:scriptForm.cmd,desc:scriptForm.desc}]);setAddScript(false);}}>Save Script</button>
+                  <button className="btn sm" onClick={()=>setAddScript(false)}>Cancel</button>
+                </div>
+              </Crd>}
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
-                {SCRIPTS.map(sc=>(
+                {scripts.map(sc=>(
                   <Crd key={sc.id} xstyle={{borderTop:"3px solid "+C.orange}}>
-                    <div style={{fontWeight:600,marginBottom:4}}>{sc.name}</div>
-                    <div style={{fontSize:13,color:C.t2,marginBottom:12}}>{sc.desc}</div>
-                    <pre style={{fontSize:11,background:C.navy,color:"#7dd3b0",padding:"10px 12px",borderRadius:8,overflow:"auto",whiteSpace:"pre-wrap",marginBottom:12,fontFamily:"monospace"}}>{sc.cmd}</pre>
-                    <div style={{display:"flex",gap:8}}><button className="btn btp sm">Push to machine</button><button className="btn sm">Copy</button></div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                      <div style={{fontWeight:600}}>{sc.name}</div>
+                      <button className="btn sm" style={{fontSize:11,padding:"2px 8px"}} onClick={()=>setScriptDetail(scriptDetail===sc.id?null:sc.id)}>{scriptDetail===sc.id?"Hide":"Details"}</button>
+                    </div>
+                    <div style={{fontSize:13,color:C.t2,marginBottom:8}}>{sc.desc}</div>
+                    {scriptDetail===sc.id && <>
+                      <div style={{fontSize:11,fontWeight:600,color:C.t3,textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:4}}>Command</div>
+                      <pre style={{fontSize:11,background:C.navy,color:"#7dd3b0",padding:"10px 12px",borderRadius:8,overflow:"auto",whiteSpace:"pre-wrap",marginBottom:8,fontFamily:"monospace"}}>{sc.cmd}</pre>
+                      <div style={{fontSize:11,fontWeight:600,color:C.t3,textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:4}}>AI Context</div>
+                      <div style={{fontSize:12,color:C.t2,background:C.bg,padding:"8px 12px",borderRadius:8,marginBottom:8}}>{sc.desc||"No description provided."}</div>
+                    </>}
+                    <div style={{display:"flex",gap:8,marginTop:4}}>
+                      <button className="btn btp sm">Push to machine</button>
+                      <button className="btn sm" onClick={()=>{navigator.clipboard.writeText(sc.cmd);}}>Copy</button>
+                      {!SCRIPTS.find(s=>s.id===sc.id) && <button className="btn sm btd" onClick={()=>setScripts(p=>p.filter(s=>s.id!==sc.id))}>Remove</button>}
+                    </div>
                   </Crd>
                 ))}
               </div>
