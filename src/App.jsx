@@ -330,9 +330,6 @@ function LoginScreen({ onLogin }) {
 export default function App() {
   const [authed, setAuthed] = useState(isLoggedIn());
   const [curUser, setCurUser] = useState(getUser());
-
-  if (!authed) return <LoginScreen onLogin={(user) => { setAuthed(true); setCurUser(user); }} />;
-
   const [roles,    setRoles]    = useState(ROLES0);
   const [techs,    setTechs]    = useState(TECHS0);
   const [prios,    setPrios]    = useState(PRIO0);
@@ -731,6 +728,9 @@ export default function App() {
     .ntab.on{color:${C.t1};border-bottom-color:${C.orange};}
     @keyframes spin{to{transform:rotate(360deg)}}
   `;
+
+  // ── Auth gate ──────────────────────────────────────────────
+  if (!authed) return <LoginScreen onLogin={(user) => { setAuthed(true); setCurUser(user); }} />;
 
   // ── Render ───────────────────────────────────────────────
   return (
