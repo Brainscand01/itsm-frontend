@@ -1,0 +1,282 @@
+# ITSM Frontend Integration — Claude Code Brief
+
+## Overview
+Wire the existing Ignition Group ITSM Console React app to the live FastAPI backend
+at https://itsmbackend.vercel.app. Replace all in-memory state with real API calls.
+The frontend is a single-file React app (JSX, no build step required).
+
+## Live Backend Base URL
+https://itsmbackend.vercel.app
+
+## API Key for agent/internal endpoints
+itsm-agent-key-2025
+
+---
+
+## What needs to change
+
+### 1. Create an API service layer
+Create a file `src/api.js` with all backend calls centralised:
+
+```js
+const BASE = "https://itsmbackend.vercel.app";
+const API_KEY = "itsm-agent-key-2025";
+
+const headers = {
+  "Content-Type": "application/json",
+  "X-API-Key": API_KEY
+};
+
+// Tickets
+export const fetchTickets       = () => fetch(`${BASE}/api/tickets`).then(r=>r.json());
+export const fetchTicket        = id => fetch(`${BASE}/api/tickets/${id}`).then(r=>r.json());
+export const createTicket       = body => fetch(`${BASE}/api/tickets`, {method:"POST",headers,body:JSON.stringify(body)}).then(r=>r.json());
+export const updateTicket       = (id,body) => fetch(`${BASE}/api/tickets/${id}`, {method:"PATCH",headers,body:JSON.stringify(body)}).then(r=>r.json());
+export const deleteTicket       = id => fetch(`${BASE}/api/tickets/${id}`, {method:"DELETE",headers}).then(r=>r.json());
+
+// Notes
+export const fetchNotes         = id => fetch(`${BASE}/api/tickets/${id}/notes`).then(r=>r.json());
+export const addNote            = (id,body) => fetch(`${BASE}/api/tickets/${id}/notes`, {method:"POST",headers,body:JSON.stringify(body)}).then(r=>r.json());
+export const fetchInternalNotes = id => fetch(`${BASE}/api/tickets/${id}/internal-notes`, {headers}).then(r=>r.json());
+export const addInternalNote    = (id,body) => fetch(`${BASE}/api/tickets/${id}/internal-notes`, {method:"POST",headers,body:JSON.stringify(body)}).then(r=>r.json());
+
+// Health
+export const fetchHealth        = () => fetch(`${BASE}/api/health`).then(r=>r.json());
+export const fetchHealthEvents  = () => fetch(`${BASE}/api/health/events`).then(r=>r.json());
+
+// Agent payloads
+export const fetchAgentPayloads = ticketId => fetch(`${BASE}/api/agent/payload?ticket_id=${ticketId}`, {headers}).then(r=>r.json());
+```
+
+---
+
+### 2. App startup — load tickets from backend
+On mount, replace `useState(TIX0)` with a `useEffect` that calls `fetchTickets()`:
+
+```js
+const [tickets, setTickets] = useState([]);
+const [loading, setLoading] = useState(true);
+
+useEffect(() => {
+  fetchTickets().then(res => {
+    if (res.data) setTickets(res.data);
+    setLoading(false);
+  });
+}, []);
+```
+
+Show a loading spinner while `loading === true`.
+
+---
+
+### 3. Create ticket — POST to backend
+When user submits new ticket form, call `createTicket()` before adding to local state:
+
+```js
+const handleCreateTicket = async (tkData) => {
+  const id = "TKT-" + (++tkCounter);
+  const payload = {
+    id,
+    title: tkData.title,
+    description: tkData.desc,
+    category: tkData.cat,
+    priority: tkData.pri,
+    status: "Open",
+    classification: tkData.cls,
+    group_type: tkData.grp,
+    user_name: tkData.user,
+    machine_name: tkData.mac,
+    ip_address: tkData.ip,
+    assignee: tkData.asgn,
+    logs: tkData.logs || ""
+  };
+  const res = await createTicket(payload);
+  if (res.data) {
+    setTickets(p => [res.data, ...p]);
+    return res.data;
+  }
+};
+```
+
+---
+
+### 4. Update ticket — PATCH to backend
+When status, priority, assignee or classification changes:
+
+```js
+const handleUpdateTicket = async (id, patch) => {
+  // Optimistic update local state immediately
+  setTickets(p => p.map(t => t.id===id ? {...t,...patch} : t));
+  if (selTk?.id===id) setSelTk(p => ({...p,...patch}));
+  // Sync to backend
+  await updateTicket(id, patch);
+};
+```
+
+---
+
+### 5. Notes — load and save to backend
+
+On ticket detail open, load notes:
+```js
+useEffect(() => {
+  if (!selTk) return;
+  fetchNotes(selTk.id).then(res => {
+    if (res.data) updTk(selTk.id, { notes: res.data });
+  });
+  fetchInternalNotes(selTk.id).then(res => {
+    if (res.data) updTk(selTk.id, { internalNotes: res.data });
+  });
+}, [selTk?.id]);
+```
+
+On add note:
+```js
+const handleAddNote = async (ticketId, text, isInternal) => {
+  const fn = isInternal ? addInternalNote : addNote;
+  const res = await fn(ticketId, { text, author: "Daryl" });
+  if (res.data) {
+    const field = isInternal ? "internalNotes" : "notes";
+    updTk(ticketId, { [field]: [...(tickets.find(t=>t.id===ticketId)?.[field]||[]), res.data] });
+  }
+};
+```
+
+---
+
+### 6. System Health tab — poll backend health
+
+```js
+const [backendHealth, setBackendHealth] = useState(null);
+
+useEffect(() => {
+  const check = () => fetchHealth().then(res => setBackendHealth(res));
+  check();
+  const iv = setInterval(check, 60000); // poll every 60s
+  return () => clearInterval(iv);
+}, []);
+```
+
+Add a new "Backend API" card to the System Health tab:
+- Green if `/api/health` returns `{status: "ok"}`
+- Red if fetch fails
+- Show last checked timestamp
+
+---
+
+### 7. Agent payload display on ticket detail
+
+When a ticket has machine data from the Desktop Agent, show it:
+
+```js
+useEffect(() => {
+  if (!selTk) return;
+  fetchAgentPayloads(selTk.id).then(res => {
+    if (res.data && res.data.length > 0) {
+      setAgentData(res.data[0]); // most recent payload
+    }
+  });
+}, [selTk?.id]);
+```
+
+On the ticket detail page, add a new "Machine Data" card below logs:
+- Machine name, IP, OS info
+- Disk usage
+- Top running processes
+- Recent event log entries from agent
+- "Collected by Desktop Agent" badge
+
+---
+
+### 8. Settings — add API Configuration tab
+
+Add a new settings tab "API Config" with:
+- Backend URL field (default: https://itsmbackend.vercel.app)
+- API Key field (masked, show/hide toggle)
+- "Test connection" button that hits /api/health and shows result
+- Save button that stores to localStorage
+
+---
+
+### 9. Error handling
+
+Wrap all API calls with try/catch. Show a toast/banner on error:
+
+```js
+const [apiError, setApiError] = useState(null);
+
+// In any API call:
+try {
+  const res = await createTicket(payload);
+  if (res.error) throw new Error(res.error);
+  // handle success
+} catch (e) {
+  setApiError("Failed to save ticket: " + e.message);
+  setTimeout(() => setApiError(null), 5000);
+}
+```
+
+Show error banner at top of page when `apiError` is set.
+
+---
+
+### 10. Loading states
+
+Add loading indicators:
+- Full page spinner on initial load
+- Button loading state when creating/updating tickets
+- "Saving…" indicator on note add
+- Skeleton rows in ticket table while fetching
+
+---
+
+## Field mapping — Frontend to Backend
+
+| Frontend field | Backend field      |
+|---------------|--------------------|
+| t.title       | title              |
+| t.cat         | category           |
+| t.pri         | priority           |
+| t.st          | status             |
+| t.cls         | classification     |
+| t.grp         | group_type         |
+| t.user        | user_name          |
+| t.mac         | machine_name       |
+| t.ip          | ip_address         |
+| t.asgn        | assignee           |
+| t.logs        | logs               |
+| t.created     | created_at         |
+
+Map these when sending to backend and when reading from backend response.
+
+---
+
+## Keep in-memory (do NOT move to backend yet)
+- roles, techs, prios, statuses, bh, cls (settings config)
+- chats (Teams chat — backend comes later with Teams API)
+- mons (configurable monitors — backend comes with Desktop Agent)
+- kb (knowledge base — backend comes later)
+- assignLog (auto-assignment log)
+
+These can move to backend in a future session once the core ticket sync is stable.
+
+---
+
+## Deployment
+The frontend is a React artifact running in claude.ai — no deployment needed.
+Once the console is moved to a standalone app, it will be deployed to Vercel
+as a static React app in a separate repo `itsm-frontend`.
+
+For now, Claude Code should output the updated single-file React component
+with all the above changes applied, ready to paste back into the artifact.
+
+---
+
+## Test checklist after wiring
+- [ ] Tickets load from Supabase on page open
+- [ ] Create ticket appears in Supabase tickets table
+- [ ] Update ticket status syncs to Supabase
+- [ ] Public note saves and reloads from backend
+- [ ] Internal note saves and reloads from backend
+- [ ] /api/health shows green in System Health tab
+- [ ] Error banner shows if backend unreachable
