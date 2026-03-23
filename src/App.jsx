@@ -1285,24 +1285,26 @@ export default function App() {
                   </div>
                 </Crd>
               )}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10,marginBottom:20}}>
+              <div style={{display:"flex",flexWrap:"wrap",gap:14,marginBottom:20}}>
                 {mons.map(m=>{
                   const sc=m.st==="healthy"?C.grn:m.st==="error"?C.red:C.t3; const ck=chkId===m.id;
                   return(
-                    <Crd key={m.id} xstyle={{borderLeft:"3px solid "+sc}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                        <div><div style={{fontWeight:600,fontSize:13,marginBottom:2}}>{m.name}</div><div style={{fontSize:11,color:C.t3,fontFamily:"monospace"}}>{m.target}</div></div>
-                        <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:8}}><Bdg label={m.type==="http"?"HTTP":"Host"} bg={C.neu} fg={C.t2} xstyle={{fontSize:10}}/><div style={{width:8,height:8,borderRadius:"50%",background:sc}}/></div>
-                      </div>
-                      <div style={{fontSize:12,color:C.t2,marginBottom:8}}>
-                        {m.st==="unknown"&&"Not checked yet"}{m.st==="healthy"&&<span style={{color:C.grn}}>Online{m.ms?" \u00B7 "+m.ms+"ms":""}</span>}{m.st==="error"&&<span style={{color:C.red}}>Unreachable</span>}{m.checked&&<span style={{color:C.t3}}> \u00B7 {m.checked}</span>}
-                      </div>
-                      <div style={{display:"flex",gap:6}}>
-                        <button className="btn sm bti" onClick={()=>checkMon(m)} disabled={ck}>{ck?"Checking\u2026":"Check now"}</button>
-                        <button className="btn sm" onClick={()=>{setEMon(m.id);setMonF({name:m.name,type:m.type,target:m.target});setAddMon(false);}}>Edit</button>
-                        <button className="btn sm btd" onClick={()=>setMons(p=>p.filter(x=>x.id!==m.id))}>Remove</button>
-                      </div>
-                    </Crd>
+                    <div key={m.id} style={{minWidth:300,maxWidth:400,flex:"1 1 300px"}}>
+                      <Crd xstyle={{borderLeft:"3px solid "+sc,height:"100%"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                          <div><div style={{fontWeight:600,fontSize:13,marginBottom:2}}>{m.name}</div><div style={{fontSize:11,color:C.t3,fontFamily:"monospace",wordBreak:"break-all"}}>{m.target}</div></div>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:8}}><Bdg label={m.type==="http"?"HTTP":"Host"} bg={C.neu} fg={C.t2} xstyle={{fontSize:10}}/><div style={{width:8,height:8,borderRadius:"50%",background:sc}}/></div>
+                        </div>
+                        <div style={{fontSize:12,color:C.t2,marginBottom:8}}>
+                          {m.st==="unknown"&&"Not checked yet"}{m.st==="healthy"&&<span style={{color:C.grn}}>Online{m.ms?" \u00B7 "+m.ms+"ms":""}</span>}{m.st==="error"&&<span style={{color:C.red}}>Unreachable</span>}{m.checked&&<span style={{color:C.t3}}> \u00B7 {m.checked}</span>}
+                        </div>
+                        <div style={{display:"flex",gap:6}}>
+                          <button className="btn sm bti" onClick={()=>checkMon(m)} disabled={ck}>{ck?"Checking\u2026":"Check now"}</button>
+                          <button className="btn sm" onClick={()=>{setEMon(m.id);setMonF({name:m.name,type:m.type,target:m.target});setAddMon(false);}}>Edit</button>
+                          <button className="btn sm btd" onClick={()=>setMons(p=>p.filter(x=>x.id!==m.id))}>Remove</button>
+                        </div>
+                      </Crd>
+                    </div>
                   );
                 })}
                 {mons.length===0 && <div style={{fontSize:13,color:C.t3}}>No monitors configured.</div>}
