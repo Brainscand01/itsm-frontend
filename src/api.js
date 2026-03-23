@@ -2,6 +2,8 @@
 // Backend: https://itsmbackend.vercel.app
 // API Key: OlO9agvGA2
 
+import { getToken } from "./auth";
+
 const STORAGE_KEY = "itsm_api_config";
 
 function getConfig() {
@@ -24,10 +26,13 @@ function base() { return getConfig().baseUrl; }
 function key()  { return getConfig().apiKey; }
 
 function headers() {
-  return {
+  const h = {
     "Content-Type": "application/json",
     "X-API-Key": key(),
   };
+  const token = getToken();
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  return h;
 }
 
 // ── Field mapping ───────────────────────────────────────────
@@ -166,6 +171,32 @@ export async function fetchHealthEvents() {
 export async function fetchAgentPayloads(ticketId) {
   const res = await fetch(`${base()}/api/agent/payload?ticket_id=${ticketId}`, {
     headers: headers(),
+  });
+  return res.json();
+}
+
+// ── Auth ────────────────────────────────────────────────────
+export async function apiLogin(email, password) {
+  const res = await fetch(`${base()}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  return res.json();
+}
+
+export async function apiMe() {
+  const res = await fetch(`${base()}/api/auth/me`, {
+    headers: headers(),
+  });
+  return res.json();
+}
+
+export async function apiChangePassword(currentPassword, newPassword) {
+  const res = await fetch(`${base()}/api/auth/change-password`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
   });
   return res.json();
 }

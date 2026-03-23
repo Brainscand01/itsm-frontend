@@ -4,7 +4,9 @@ import {
   fetchNotes, addNote as apiAddNote, fetchInternalNotes, addInternalNote as apiAddInternalNote,
   fetchHealth, fetchAgentPayloads,
   loadConfig, saveConfig, toBackend,
+  apiLogin, apiChangePassword,
 } from './api.js';
+import { isLoggedIn, saveAuth, clearAuth, getUser, logout } from './auth.js';
 
 const MODEL = "claude-sonnet-4-20250514";
 
@@ -266,8 +268,71 @@ function Spinner({ size, color }) {
   );
 }
 
+// ── Login Screen ────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      const res = await apiLogin(email.trim(), password);
+      if (res.error) { setError(res.error); setBusy(false); return; }
+      saveAuth(res.data.token, res.data.user);
+      onLogin(res.data.user);
+    } catch (err) {
+      setError("Connection error. Please try again.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:`linear-gradient(135deg, ${C.navy} 0%, #1a2a3f 100%)`, display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Inter',system-ui,sans-serif" }}>
+      <div style={{ width:400, maxWidth:"90vw" }}>
+        <div style={{ textAlign:"center", marginBottom:32 }}>
+          <HexLogo size={56} />
+          <div style={{ fontSize:22, fontWeight:700, color:"#fff", marginTop:12 }}>Ignition ITSM</div>
+          <div style={{ fontSize:13, color:C.t3, marginTop:4 }}>IT Service Management Console</div>
+        </div>
+        <form onSubmit={handleSubmit} style={{ background:C.card, borderRadius:16, padding:"32px 28px", boxShadow:"0 8px 32px rgba(0,0,0,0.3)" }}>
+          <div style={{ fontSize:18, fontWeight:600, color:C.t1, marginBottom:4 }}>Sign In</div>
+          <div style={{ fontSize:13, color:C.t2, marginBottom:24 }}>Enter your credentials to access the console</div>
+          {error && <div style={{ background:C.redBg, color:C.redT, padding:"10px 14px", borderRadius:8, fontSize:13, marginBottom:16, fontWeight:500 }}>{error}</div>}
+          <div style={{ marginBottom:16 }}>
+            <label style={{ fontSize:12, fontWeight:500, color:C.t2, display:"block", marginBottom:6 }}>Email address</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@ignitiongroup.co.za" required autoFocus
+              style={{ width:"100%", padding:"10px 12px", border:"1px solid "+C.border, borderRadius:8, fontSize:14, outline:"none", boxSizing:"border-box" }} />
+          </div>
+          <div style={{ marginBottom:24 }}>
+            <label style={{ fontSize:12, fontWeight:500, color:C.t2, display:"block", marginBottom:6 }}>Password</label>
+            <div style={{ position:"relative" }}>
+              <input type={showPw?"text":"password"} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter password" required
+                style={{ width:"100%", padding:"10px 40px 10px 12px", border:"1px solid "+C.border, borderRadius:8, fontSize:14, outline:"none", boxSizing:"border-box" }} />
+              <span onClick={()=>setShowPw(!showPw)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", cursor:"pointer", fontSize:12, color:C.t3, userSelect:"none" }}>{showPw?"Hide":"Show"}</span>
+            </div>
+          </div>
+          <button type="submit" disabled={busy} style={{ width:"100%", padding:"11px 0", background:busy?C.t3:C.orange, color:"#fff", fontWeight:600, fontSize:14, border:"none", borderRadius:8, cursor:busy?"wait":"pointer", transition:"background 0.2s" }}>
+            {busy ? "Signing in..." : "Sign In"}
+          </button>
+        </form>
+        <div style={{ textAlign:"center", marginTop:24, fontSize:11, color:C.t3 }}>Ignition Group IT &middot; Service Management Platform</div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main App ─────────────────────────────────────────────────
 export default function App() {
+  const [authed, setAuthed] = useState(isLoggedIn());
+  const [curUser, setCurUser] = useState(getUser());
+
+  if (!authed) return <LoginScreen onLogin={(user) => { setAuthed(true); setCurUser(user); }} />;
+
   const [roles,    setRoles]    = useState(ROLES0);
   const [techs,    setTechs]    = useState(TECHS0);
   const [prios,    setPrios]    = useState(PRIO0);
@@ -457,7 +522,7 @@ export default function App() {
     setNoteSaving(true);
     try {
       const fn = isInternal ? apiAddInternalNote : apiAddNote;
-      const res = await fn(ticketId, { text, author: "Daryl" });
+      const res = await fn(ticketId, { text, author: curUser?.name || "Tech" });
       if (res.data) {
         const field = isInternal ? "internalNotes" : "notes";
         const tk = tickets.find(t => t.id === ticketId);
@@ -466,14 +531,14 @@ export default function App() {
         // Fallback local
         const field = isInternal ? "internalNotes" : "notes";
         const tk = tickets.find(t => t.id === ticketId);
-        const note = { text, ts: new Date().toLocaleString(), author: "Daryl", type: isInternal ? "internal" : "public" };
+        const note = { text, ts: new Date().toLocaleString(), author: curUser?.name || "Tech", type: isInternal ? "internal" : "public" };
         updTk(ticketId, { [field]: [...(tk?.[field] || []), note] });
       }
     } catch (e) {
       // Fallback local
       const field = isInternal ? "internalNotes" : "notes";
       const tk = tickets.find(t => t.id === ticketId);
-      const note = { text, ts: new Date().toLocaleString(), author: "Daryl", type: isInternal ? "internal" : "public" };
+      const note = { text, ts: new Date().toLocaleString(), author: curUser?.name || "Tech", type: isInternal ? "internal" : "public" };
       updTk(ticketId, { [field]: [...(tk?.[field] || []), note] });
       showError("Note saved locally only: " + e.message);
     }
@@ -699,8 +764,12 @@ export default function App() {
           })}
         </nav>
         <div style={{borderTop:"1px solid "+C.navyBorder,padding:"12px 10px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-          <div style={{width:32,height:32,borderRadius:"50%",background:C.orange,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff",flexShrink:0}}>D</div>
-          {sideOpen && <div><div style={{fontSize:13,fontWeight:600,color:"#fff"}}>Daryl</div><div style={{fontSize:11,color:C.orange,fontWeight:500}}>Admin</div></div>}
+          <div style={{width:32,height:32,borderRadius:"50%",background:C.orange,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff",flexShrink:0}}>{(curUser?.name||"U")[0]}</div>
+          {sideOpen && <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{curUser?.name||"User"}</div>
+            <div style={{fontSize:11,color:C.orange,fontWeight:500}}>{curUser?.role||"Tech"}</div>
+          </div>}
+          {sideOpen && <span onClick={logout} title="Sign out" style={{cursor:"pointer",color:C.t3,fontSize:11,padding:"4px 8px",borderRadius:6,background:"rgba(255,255,255,0.08)"}}>&times;</span>}
         </div>
       </div>
 
