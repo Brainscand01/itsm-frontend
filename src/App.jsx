@@ -14,7 +14,7 @@ import { isLoggedIn, saveAuth, clearAuth, getUser, logout } from './auth.js';
 const MODEL = "claude-sonnet-4-20250514";
 
 async function callAI(msgs, sys) {
-  const token = localStorage.getItem("itsm_token") || "";
+  const token = (() => { try { const d = JSON.parse(localStorage.getItem("itsm_auth") || "null"); return d?.token || ""; } catch { return ""; } })();
   const r = await fetch("https://itsmbackend.vercel.app/api/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
