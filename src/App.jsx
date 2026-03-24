@@ -1568,33 +1568,6 @@ export default function App() {
                   <div>
                     <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Priority Types & SLA</div>
                     <div style={{fontSize:13,color:C.t2,marginBottom:16}}>When a ticket has a priority set, these SLA times override the classification SLA.</div>
-                    <Crd xstyle={{marginBottom:20,borderLeft:"4px solid "+C.blu,background:C.bluBg}}>
-                      <div style={{fontWeight:700,fontSize:14,color:C.bluT,marginBottom:10}}>SLA Calculation Rules</div>
-                      <div style={{fontSize:13,color:C.t1,lineHeight:1.8}}>
-                        <div style={{fontWeight:600,marginBottom:4}}>How SLA is measured:</div>
-                        <ul style={{paddingLeft:18,marginBottom:12}}>
-                          <li>SLA timer <strong>starts</strong> when a ticket is created (status: Open)</li>
-                          <li>SLA timer <strong>runs</strong> through: Open, In Progress, User Feedback Received, Reopened</li>
-                          <li>SLA timer <strong>pauses</strong> when status is set to "Pending User Feedback"</li>
-                          <li>SLA timer <strong>resumes</strong> when status changes from "Pending User Feedback" to any active status</li>
-                          <li>SLA timer <strong>stops</strong> when ticket is marked as "Resolved"</li>
-                          <li><strong>Total SLA</strong> = (Resolved time - Created time) - Total paused time</li>
-                        </ul>
-                        <div style={{fontWeight:600,marginBottom:4}}>Status transitions:</div>
-                        <ul style={{paddingLeft:18,marginBottom:12}}>
-                          <li>Open &rarr; In Progress &rarr; Resolved <em>(standard flow)</em></li>
-                          <li>Any status &rarr; Pending User Feedback <em>(SLA pauses)</em></li>
-                          <li>Pending User Feedback &rarr; User Feedback Received <em>(SLA resumes)</em></li>
-                          <li>Resolved &rarr; Reopened <em>(new SLA cycle, timer resets)</em></li>
-                          <li>Resolved &rarr; Closed <em>(auto after 24h with no user response)</em></li>
-                        </ul>
-                        <div style={{fontWeight:600,marginBottom:4}}>SLA targets determined by:</div>
-                        <ol style={{paddingLeft:18}}>
-                          <li><strong>Priority level</strong> (if set) &mdash; takes precedence</li>
-                          <li><strong>Classification type</strong> (fallback if no priority set)</li>
-                        </ol>
-                      </div>
-                    </Crd>
                     {prios.map(p=>(
                       <Crd key={p.id} xstyle={{marginBottom:12,borderLeft:"3px solid "+p.color}}>
                         {ePrio===p.id ? (
@@ -1623,6 +1596,33 @@ export default function App() {
                         )}
                       </Crd>
                     ))}
+                    <Crd xstyle={{marginTop:20,borderLeft:"4px solid "+C.blu,background:C.bluBg}}>
+                      <div style={{fontWeight:700,fontSize:14,color:C.bluT,marginBottom:10}}>SLA Calculation Rules</div>
+                      <div style={{fontSize:13,color:C.t1,lineHeight:1.8}}>
+                        <div style={{fontWeight:600,marginBottom:4}}>How SLA is measured:</div>
+                        <ul style={{paddingLeft:18,marginBottom:12}}>
+                          <li>SLA timer <strong>starts</strong> when a ticket is created (status: Open)</li>
+                          <li>SLA timer <strong>runs</strong> through: Open, In Progress, User Feedback Received, Reopened</li>
+                          <li>SLA timer <strong>pauses</strong> when status is set to "Pending User Feedback"</li>
+                          <li>SLA timer <strong>resumes</strong> when status changes from "Pending User Feedback" to any active status</li>
+                          <li>SLA timer <strong>stops</strong> when ticket is marked as "Resolved"</li>
+                          <li><strong>Total SLA</strong> = (Resolved time - Created time) - Total paused time</li>
+                        </ul>
+                        <div style={{fontWeight:600,marginBottom:4}}>Status transitions:</div>
+                        <ul style={{paddingLeft:18,marginBottom:12}}>
+                          <li>Open &rarr; In Progress &rarr; Resolved <em>(standard flow)</em></li>
+                          <li>Any status &rarr; Pending User Feedback <em>(SLA pauses)</em></li>
+                          <li>Pending User Feedback &rarr; User Feedback Received <em>(SLA resumes)</em></li>
+                          <li>Resolved &rarr; Reopened <em>(new SLA cycle, timer resets)</em></li>
+                          <li>Resolved &rarr; Closed <em>(auto after 24h with no user response)</em></li>
+                        </ul>
+                        <div style={{fontWeight:600,marginBottom:4}}>SLA targets determined by:</div>
+                        <ol style={{paddingLeft:18}}>
+                          <li><strong>Priority level</strong> (if set) &mdash; takes precedence</li>
+                          <li><strong>Classification type</strong> (fallback if no priority set)</li>
+                        </ol>
+                      </div>
+                    </Crd>
                   </div>
                 )}
 
