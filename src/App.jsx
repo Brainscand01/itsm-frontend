@@ -442,6 +442,7 @@ export default function App() {
   const [emailLogs, setEmailLogs] = useState([]);
   const [emailLogLoading, setEmailLogLoading] = useState(false);
   const [emailTestResult, setEmailTestResult] = useState(null);
+  const [showM365Guide, setShowM365Guide] = useState(false);
 
   const chatEnd = useRef(null);
   useEffect(() => { chatEnd.current && chatEnd.current.scrollIntoView({ behavior:"smooth" }); }, [selCh]);
@@ -1701,11 +1702,44 @@ export default function App() {
                         <input type="number" style={{marginBottom:16,width:100}} value={ec.polling_interval_minutes||5} onChange={e=>setEc("polling_interval_minutes",parseInt(e.target.value)||5)}/>
 
                         {ec.provider==="microsoft365" ? (<div>
-                          <div style={{fontWeight:600,fontSize:13,marginBottom:8,color:C.orange}}>Office 365 Settings</div>
-                          <Lbl text="Tenant ID"/><input style={{marginBottom:8}} value={ec.m365_tenant_id||""} onChange={e=>setEc("m365_tenant_id",e.target.value)}/>
-                          <Lbl text="Client ID"/><input style={{marginBottom:8}} value={ec.m365_client_id||""} onChange={e=>setEc("m365_client_id",e.target.value)}/>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                            <div style={{fontWeight:600,fontSize:13,color:C.orange}}>Office 365 Settings (ROPC — Service Account)</div>
+                            <button className="btn sm" style={{fontSize:11}} onClick={()=>setShowM365Guide(p=>!p)}>{showM365Guide?"Hide":"Setup Guide"}</button>
+                          </div>
+                          {showM365Guide && (
+                            <div style={{padding:16,background:C.bg,borderRadius:8,marginBottom:16,fontSize:12,lineHeight:1.8,border:"1px solid "+C.border}}>
+                              <div style={{fontWeight:700,fontSize:14,marginBottom:8}}>Microsoft 365 Email Setup Guide</div>
+                              <div style={{fontWeight:600,marginBottom:4}}>Step 1: Create App Registration</div>
+                              <div>1. Go to <b>portal.azure.com</b> &rarr; Entra ID &rarr; App registrations &rarr; New registration</div>
+                              <div>2. Name: <code>ITSM Email Integration</code> &middot; Single tenant &middot; No redirect URI</div>
+                              <div style={{fontWeight:600,marginTop:8,marginBottom:4}}>Step 2: Enable ROPC Flow</div>
+                              <div>1. In the app &rarr; <b>Authentication</b> &rarr; Advanced settings &rarr; <b>Allow public client flows = Yes</b></div>
+                              <div style={{fontWeight:600,marginTop:8,marginBottom:4}}>Step 3: API Permissions (Delegated only)</div>
+                              <div>1. API permissions &rarr; Add &rarr; Microsoft Graph &rarr; <b>Delegated</b> permissions</div>
+                              <div>2. Add: <code>Mail.Read</code>, <code>Mail.ReadWrite</code>, <code>Mail.Send</code>, <code>User.Read</code></div>
+                              <div>3. Click <b>Grant admin consent</b></div>
+                              <div style={{fontWeight:600,marginTop:8,marginBottom:4}}>Step 4: Client Secret</div>
+                              <div>1. Certificates &amp; secrets &rarr; New client secret &rarr; Copy value immediately</div>
+                              <div style={{fontWeight:600,marginTop:8,marginBottom:4}}>Step 5: Create Service Account</div>
+                              <div>1. M365 Admin Centre &rarr; Users &rarr; Add user (e.g. <code>itsm-service@yourcompany.com</code>)</div>
+                              <div>2. Assign a basic license (Exchange Online). Disable MFA for this account.</div>
+                              <div style={{fontWeight:600,marginTop:8,marginBottom:4}}>Step 6: Grant Shared Mailbox Access</div>
+                              <div>1. Exchange Admin &rarr; Shared mailbox &rarr; Mailbox delegation</div>
+                              <div>2. Add service account as <b>Full Access</b> + <b>Send As</b></div>
+                              <div style={{marginTop:8,padding:"8px 12px",background:"#fff3cd",borderRadius:6,color:"#856404"}}>
+                                <b>Security:</b> This approach uses delegated permissions. The service account can ONLY access the one shared mailbox it has been granted access to. No tenant-wide mail access.
+                              </div>
+                            </div>
+                          )}
+                          <Lbl text="Tenant ID"/><input style={{marginBottom:8}} value={ec.m365_tenant_id||""} onChange={e=>setEc("m365_tenant_id",e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+                          <Lbl text="Client ID (App Registration)"/><input style={{marginBottom:8}} value={ec.m365_client_id||""} onChange={e=>setEc("m365_client_id",e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
                           <Lbl text="Client Secret"/><input type="password" style={{marginBottom:8}} value={ec.m365_client_secret||""} onChange={e=>setEc("m365_client_secret",e.target.value)}/>
-                          <Lbl text="Mailbox address"/><input style={{marginBottom:12}} value={ec.m365_mailbox||""} onChange={e=>setEc("m365_mailbox",e.target.value)}/>
+                          <div style={{fontWeight:600,fontSize:12,marginTop:8,marginBottom:6,color:C.t2}}>Service Account Credentials</div>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                            <div><Lbl text="Service account email"/><input value={ec.m365_service_email||""} onChange={e=>setEc("m365_service_email",e.target.value)} placeholder="itsm-service@yourcompany.com"/></div>
+                            <div><Lbl text="Service account password"/><input type="password" value={ec.m365_service_password||""} onChange={e=>setEc("m365_service_password",e.target.value)}/></div>
+                          </div>
+                          <Lbl text="Shared mailbox address"/><input style={{marginBottom:12}} value={ec.m365_mailbox||""} onChange={e=>setEc("m365_mailbox",e.target.value)} placeholder="itsupport@yourcompany.com"/>
                         </div>) : (<div>
                           <div style={{fontWeight:600,fontSize:13,marginBottom:8,color:C.orange}}>IMAP Settings (Inbound)</div>
                           <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:8,marginBottom:8}}>
