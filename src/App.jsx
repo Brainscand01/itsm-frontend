@@ -11,7 +11,7 @@ import {
 } from './api.js';
 import { isLoggedIn, saveAuth, clearAuth, getUser, logout } from './auth.js';
 
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-haiku-4-5-20251001";
 
 async function callAI(msgs, sys) {
   const token = (() => { try { const d = JSON.parse(localStorage.getItem("itsm_auth") || "null"); return d?.token || ""; } catch { return ""; } })();
