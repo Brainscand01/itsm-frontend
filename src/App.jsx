@@ -5,6 +5,9 @@ import {
   fetchHealth, fetchAgentPayloads,
   loadConfig, saveConfig, toBackend,
   apiLogin, apiChangePassword,
+  fetchRequesters, createRequester, updateRequester, deleteRequester,
+  fetchEmailConfig, saveEmailConfig, testEmailConnection,
+  fetchEmailTemplates, updateEmailTemplate, fetchEmailLog,
 } from './api.js';
 import { isLoggedIn, saveAuth, clearAuth, getUser, logout } from './auth.js';
 
@@ -136,7 +139,7 @@ const NAV = [
   {id:"dashboard",label:"Dashboard"},{id:"tickets",label:"Tickets"},{id:"create",label:"New Ticket"},
   {id:"teams",label:"Teams Chat"},{id:"reports",label:"Reports"},{id:"health",label:"System Health"},
   {id:"logs",label:"Log Analyser"},{id:"scripts",label:"Self-Heal"},{id:"kb",label:"Knowledge Base"},
-  {id:"settings",label:"Settings"},
+  {id:"users",label:"Users"},{id:"settings",label:"Settings"},
 ];
 let tkCounter = 1007;
 
@@ -423,6 +426,23 @@ export default function App() {
   const [scriptDetail, setScriptDetail] = useState(null);
   const [monF,setMonF]         = useState({ name:"", type:"http", target:"" });
 
+  // ── Requesters / Email state ──────────────────────────────
+  const [requesters, setRequesters] = useState([]);
+  const [reqLoading, setReqLoading] = useState(false);
+  const [addReq, setAddReq] = useState(false);
+  const [reqForm, setReqForm] = useState({ name:"", email:"", department:"", phone:"", password:"" });
+  const [editReq, setEditReq] = useState(null);
+  const [reqQ, setReqQ] = useState("");
+  const [emailCfg, setEmailCfg] = useState(null);
+  const [emailCfgLoading, setEmailCfgLoading] = useState(false);
+  const [emailCfgSaving, setEmailCfgSaving] = useState(false);
+  const [emailTemplates, setEmailTemplates] = useState([]);
+  const [emailTplLoading, setEmailTplLoading] = useState(false);
+  const [editTpl, setEditTpl] = useState(null);
+  const [emailLogs, setEmailLogs] = useState([]);
+  const [emailLogLoading, setEmailLogLoading] = useState(false);
+  const [emailTestResult, setEmailTestResult] = useState(null);
+
   const chatEnd = useRef(null);
   useEffect(() => { chatEnd.current && chatEnd.current.scrollIntoView({ behavior:"smooth" }); }, [selCh]);
 
@@ -571,6 +591,104 @@ export default function App() {
 
   const navTo = id => { setTab(id); setSelTk(null); setSelCh(null); };
 
+  // ── Requesters load ──────────────────────────────────────
+  const loadRequesters = async () => {
+    setReqLoading(true);
+    try {
+      const res = await fetchRequesters();
+      if (res.data) setRequesters(res.data);
+    } catch(e) { console.error(e); }
+    setReqLoading(false);
+  };
+  useEffect(() => { if (tab === "users") loadRequesters(); }, [tab]);
+
+  const handleCreateRequester = async () => {
+    try {
+      const res = await createRequester(reqForm);
+      if (res.error) { setApiError(res.error); return; }
+      setAddReq(false);
+      setReqForm({ name:"", email:"", department:"", phone:"", password:"" });
+      loadRequesters();
+    } catch(e) { setApiError(e.message); }
+  };
+
+  const handleUpdateRequester = async (id, updates) => {
+    try {
+      const res = await updateRequester(id, updates);
+      if (res.error) { setApiError(res.error); return; }
+      setEditReq(null);
+      loadRequesters();
+    } catch(e) { setApiError(e.message); }
+  };
+
+  const handleDeactivateRequester = async (id) => {
+    try {
+      await deleteRequester(id);
+      loadRequesters();
+    } catch(e) { setApiError(e.message); }
+  };
+
+  // ── Email config/templates load ──────────────────────────
+  const loadEmailConfig = async () => {
+    setEmailCfgLoading(true);
+    try {
+      const res = await fetchEmailConfig();
+      if (res.data) setEmailCfg(res.data);
+    } catch(e) { console.error(e); }
+    setEmailCfgLoading(false);
+  };
+
+  const loadEmailTemplates = async () => {
+    setEmailTplLoading(true);
+    try {
+      const res = await fetchEmailTemplates();
+      if (res.data) setEmailTemplates(res.data);
+    } catch(e) { console.error(e); }
+    setEmailTplLoading(false);
+  };
+
+  const loadEmailLog = async () => {
+    setEmailLogLoading(true);
+    try {
+      const res = await fetchEmailLog();
+      if (res.data) setEmailLogs(res.data);
+    } catch(e) { console.error(e); }
+    setEmailLogLoading(false);
+  };
+
+  useEffect(() => {
+    if (tab === "settings" && stab === "email") loadEmailConfig();
+    if (tab === "settings" && stab === "templates") loadEmailTemplates();
+    if (tab === "settings" && stab === "emaillog") loadEmailLog();
+  }, [tab, stab]);
+
+  const handleSaveEmailConfig = async (cfg) => {
+    setEmailCfgSaving(true);
+    try {
+      const res = await saveEmailConfig(cfg);
+      if (res.error) setApiError(res.error);
+      else setEmailTestResult({ ok: true, msg: "Config saved" });
+    } catch(e) { setApiError(e.message); }
+    setEmailCfgSaving(false);
+  };
+
+  const handleTestEmail = async () => {
+    setEmailTestResult(null);
+    try {
+      const res = await testEmailConnection();
+      if (res.error) setEmailTestResult({ ok: false, msg: res.error });
+      else setEmailTestResult({ ok: true, msg: res.data?.message || "Test sent" });
+    } catch(e) { setEmailTestResult({ ok: false, msg: e.message }); }
+  };
+
+  const handleUpdateTemplate = async (id, updates) => {
+    try {
+      const res = await updateEmailTemplate(id, updates);
+      if (res.error) setApiError(res.error);
+      else loadEmailTemplates();
+    } catch(e) { setApiError(e.message); }
+  };
+
   // derived
   const stats = {
     open: tickets.filter(t=>t.st==="Open").length,
@@ -580,6 +698,10 @@ export default function App() {
     inc:  tickets.filter(t=>t.grp==="Incident").length,
     req:  tickets.filter(t=>t.grp==="Request").length,
     unassigned: tickets.filter(t=>!t.asgn&&!["Resolved","Closed"].includes(t.st)).length,
+    srcConsole: tickets.filter(t=>!t.source||t.source==="console").length,
+    srcEmail: tickets.filter(t=>t.source==="email").length,
+    srcPortal: tickets.filter(t=>t.source==="portal").length,
+    srcTeams: tickets.filter(t=>t.source==="teams").length,
   };
   const queued   = chats.filter(c=>c.st==="queue").length;
   const wkTotal  = WEEK.reduce((a,d)=>a+d.v,0);
@@ -898,6 +1020,14 @@ export default function App() {
                   ))}
                 </Crd>
               </div>
+              <Crd xstyle={{marginBottom:16}}>
+                <div style={{fontSize:13,fontWeight:600,marginBottom:10}}>Ticket sources</div>
+                <div style={{display:"flex",gap:16,fontSize:13}}>
+                  {[["Console",stats.srcConsole,C.t2],["Email",stats.srcEmail,C.blu],["Portal",stats.srcPortal,"#7C3AED"],["Teams",stats.srcTeams,C.orange]].map(r=>(
+                    <div key={r[0]} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:"50%",background:r[2]}}/><span>{r[0]}: <strong>{r[1]}</strong></span></div>
+                  ))}
+                </div>
+              </Crd>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
                 <Crd>
                   <div style={{fontSize:13,fontWeight:600,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>SLA alerts {breach.length>0&&<Bdg label={breach.length+" at risk"} bg={C.redBg} fg={C.redT}/>}</div>
@@ -973,7 +1103,7 @@ export default function App() {
                   <Crd xstyle={{marginBottom:16}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
                       <div><div style={{fontSize:12,color:C.t3,marginBottom:4,fontWeight:500}}>{t.id} \u00B7 <span style={{color:t.grp==="Incident"?C.redT:C.bluT,fontWeight:600}}>{t.grp}</span></div><div style={{fontWeight:700,fontSize:16}}>{t.title}</div></div>
-                      <div style={{display:"flex",gap:6}}><Bdg label={t.pri} bg={po.color+"22"} fg={po.color}/><Bdg label={so.label} bg={so.bg} fg={so.color}/></div>
+                      <div style={{display:"flex",gap:6}}><Bdg label={t.pri} bg={po.color+"22"} fg={po.color}/><Bdg label={so.label} bg={so.bg} fg={so.color}/>{t.source && <Bdg label={t.source} bg={t.source==="email"?C.bluBg:t.source==="portal"?"#F5F3FF":t.source==="teams"?"#EFF6FF":C.neu} fg={t.source==="email"?C.bluT:t.source==="portal"?"#7C3AED":t.source==="teams"?C.bluT:C.t2}/>}</div>
                     </div>
                     {s && (()=>{
                       const createdTs = t.created || t.created_at;
@@ -1454,11 +1584,77 @@ export default function App() {
             </div>
           )}
 
+          {/* ── USERS (Requesters) ── */}
+          {!loading && tab==="users" && (
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                <input placeholder="Search users\u2026" value={reqQ} onChange={e=>setReqQ(e.target.value)} style={{width:260}}/>
+                <button className="btn btp" onClick={()=>setAddReq(true)}>+ Add requester</button>
+              </div>
+
+              {addReq && (
+                <Crd xstyle={{marginBottom:16}}>
+                  <div style={{fontWeight:700,fontSize:15,marginBottom:12}}>New requester</div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                    <div><Lbl text="Full name"/><input value={reqForm.name} onChange={e=>setReqForm(p=>({...p,name:e.target.value}))}/></div>
+                    <div><Lbl text="Email"/><input type="email" value={reqForm.email} onChange={e=>setReqForm(p=>({...p,email:e.target.value}))}/></div>
+                    <div><Lbl text="Department"/><input value={reqForm.department} onChange={e=>setReqForm(p=>({...p,department:e.target.value}))}/></div>
+                    <div><Lbl text="Phone"/><input value={reqForm.phone} onChange={e=>setReqForm(p=>({...p,phone:e.target.value}))}/></div>
+                    <div><Lbl text="Temporary password"/><input type="password" value={reqForm.password} onChange={e=>setReqForm(p=>({...p,password:e.target.value}))}/></div>
+                  </div>
+                  <div style={{display:"flex",gap:8,marginTop:12}}><button className="btn btp" onClick={handleCreateRequester}>Create</button><button className="btn" onClick={()=>setAddReq(false)}>Cancel</button></div>
+                </Crd>
+              )}
+
+              {reqLoading ? <Spinner/> : (
+                <Crd>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                    <thead><tr style={{textAlign:"left",borderBottom:"2px solid "+C.border}}>
+                      <th style={{padding:"8px 10px"}}>Name</th><th style={{padding:"8px 10px"}}>Email</th><th style={{padding:"8px 10px"}}>Department</th><th style={{padding:"8px 10px"}}>Phone</th><th style={{padding:"8px 10px"}}>Status</th><th style={{padding:"8px 10px"}}></th>
+                    </tr></thead>
+                    <tbody>
+                      {requesters.filter(r => {
+                        if (!reqQ) return true;
+                        const q = reqQ.toLowerCase();
+                        return (r.name||"").toLowerCase().includes(q) || (r.email||"").toLowerCase().includes(q) || (r.department||"").toLowerCase().includes(q);
+                      }).map(r=>(
+                        <tr key={r.id} style={{borderBottom:"1px solid "+C.border}}>
+                          <td style={{padding:"8px 10px",fontWeight:500}}>{r.name}</td>
+                          <td style={{padding:"8px 10px",color:C.t2}}>{r.email}</td>
+                          <td style={{padding:"8px 10px"}}>{r.department||"\u2014"}</td>
+                          <td style={{padding:"8px 10px"}}>{r.phone||"\u2014"}</td>
+                          <td style={{padding:"8px 10px"}}><Bdg label={r.active!==false?"Active":"Inactive"} bg={r.active!==false?C.grnBg:C.redBg} fg={r.active!==false?C.grnT:C.redT}/></td>
+                          <td style={{padding:"8px 10px",display:"flex",gap:4}}>
+                            <button className="btn sm" onClick={()=>setEditReq(r)}>Edit</button>
+                            {r.active!==false && <button className="btn sm" style={{color:C.red}} onClick={()=>handleDeactivateRequester(r.id)}>Deactivate</button>}
+                          </td>
+                        </tr>
+                      ))}
+                      {requesters.length===0 && <tr><td colSpan={6} style={{padding:20,textAlign:"center",color:C.t3}}>No requesters yet</td></tr>}
+                    </tbody>
+                  </table>
+                </Crd>
+              )}
+
+              {editReq && (
+                <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999}} onClick={()=>setEditReq(null)}>
+                  <div style={{background:"#fff",borderRadius:12,padding:24,width:420,maxHeight:"80vh",overflow:"auto"}} onClick={e=>e.stopPropagation()}>
+                    <div style={{fontWeight:700,fontSize:15,marginBottom:12}}>Edit requester</div>
+                    <Lbl text="Name"/><input value={editReq.name} onChange={e=>setEditReq(p=>({...p,name:e.target.value}))} style={{marginBottom:8}}/>
+                    <Lbl text="Department"/><input value={editReq.department||""} onChange={e=>setEditReq(p=>({...p,department:e.target.value}))} style={{marginBottom:8}}/>
+                    <Lbl text="Phone"/><input value={editReq.phone||""} onChange={e=>setEditReq(p=>({...p,phone:e.target.value}))} style={{marginBottom:12}}/>
+                    <div style={{display:"flex",gap:8}}><button className="btn btp" onClick={()=>handleUpdateRequester(editReq.id,{name:editReq.name,department:editReq.department,phone:editReq.phone})}>Save</button><button className="btn" onClick={()=>setEditReq(null)}>Cancel</button></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── SETTINGS ── */}
           {!loading && tab==="settings" && (
             <div style={{display:"grid",gridTemplateColumns:"190px 1fr",gap:16}}>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                {[["m365","Integration"],["apiconfig","API Config"],["cls","Classifications"],["prio","Priority Types & SLA"],["status","Ticket Statuses"],["bh","Business Hours"],["assign","Auto-Assignment"],["roles","Roles"],["techs","Technicians"]].map(r=>(
+                {[["m365","Integration"],["email","Email Config"],["templates","Email Templates"],["emaillog","Email Log"],["apiconfig","API Config"],["cls","Classifications"],["prio","Priority Types & SLA"],["status","Ticket Statuses"],["bh","Business Hours"],["assign","Auto-Assignment"],["roles","Roles"],["techs","Technicians"]].map(r=>(
                   <button key={r[0]} className={"stb"+(stab===r[0]?" on":"")} onClick={()=>setStab(r[0])}>{r[1]}</button>
                 ))}
               </div>
@@ -1482,6 +1678,134 @@ export default function App() {
                         <button className="btn sm" style={{background:cfg[row[1]]?C.orange:"transparent",color:cfg[row[1]]?"#fff":C.t2,borderColor:cfg[row[1]]?C.orange:C.border,minWidth:46}} onClick={()=>setCfg(p=>({...p,[row[1]]:!p[row[1]]}))}>{cfg[row[1]]?"On":"Off"}</button>
                       </div>
                     ))}
+                  </Crd>
+                )}
+
+                {/* Email Config */}
+                {stab==="email" && (
+                  <Crd>
+                    <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Email Configuration</div>
+                    <div style={{fontSize:13,color:C.t2,marginBottom:16}}>Configure inbound/outbound email for ticket creation and notifications.</div>
+                    {emailCfgLoading ? <Spinner/> : (()=>{
+                      const ec = emailCfg || {};
+                      const setEc = (k,v) => setEmailCfg(p=>({...p,[k]:v}));
+                      return (<div>
+                        <Lbl text="Provider"/>
+                        <select style={{marginBottom:12}} value={ec.provider||"smtp_imap"} onChange={e=>setEc("provider",e.target.value)}>
+                          <option value="smtp_imap">SMTP / IMAP</option><option value="microsoft365">Microsoft 365 (Graph API)</option>
+                        </select>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+                          <Lbl text="Active"/><button className="btn sm" style={{background:ec.active?C.orange:"transparent",color:ec.active?"#fff":C.t2,borderColor:ec.active?C.orange:C.border}} onClick={()=>setEc("active",!ec.active)}>{ec.active?"On":"Off"}</button>
+                        </div>
+                        <Lbl text="Polling interval (minutes)"/>
+                        <input type="number" style={{marginBottom:16,width:100}} value={ec.polling_interval_minutes||5} onChange={e=>setEc("polling_interval_minutes",parseInt(e.target.value)||5)}/>
+
+                        {ec.provider==="microsoft365" ? (<div>
+                          <div style={{fontWeight:600,fontSize:13,marginBottom:8,color:C.orange}}>Office 365 Settings</div>
+                          <Lbl text="Tenant ID"/><input style={{marginBottom:8}} value={ec.m365_tenant_id||""} onChange={e=>setEc("m365_tenant_id",e.target.value)}/>
+                          <Lbl text="Client ID"/><input style={{marginBottom:8}} value={ec.m365_client_id||""} onChange={e=>setEc("m365_client_id",e.target.value)}/>
+                          <Lbl text="Client Secret"/><input type="password" style={{marginBottom:8}} value={ec.m365_client_secret||""} onChange={e=>setEc("m365_client_secret",e.target.value)}/>
+                          <Lbl text="Mailbox address"/><input style={{marginBottom:12}} value={ec.m365_mailbox||""} onChange={e=>setEc("m365_mailbox",e.target.value)}/>
+                        </div>) : (<div>
+                          <div style={{fontWeight:600,fontSize:13,marginBottom:8,color:C.orange}}>IMAP Settings (Inbound)</div>
+                          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:8,marginBottom:8}}>
+                            <div><Lbl text="IMAP Host"/><input value={ec.imap_host||""} onChange={e=>setEc("imap_host",e.target.value)}/></div>
+                            <div><Lbl text="Port"/><input type="number" value={ec.imap_port||993} onChange={e=>setEc("imap_port",parseInt(e.target.value))}/></div>
+                            <div><Lbl text="SSL"/><button className="btn sm" style={{marginTop:4,background:ec.imap_ssl!==false?C.grn:"transparent",color:ec.imap_ssl!==false?"#fff":C.t2}} onClick={()=>setEc("imap_ssl",!ec.imap_ssl)}>{ec.imap_ssl!==false?"Yes":"No"}</button></div>
+                          </div>
+                          <div style={{fontWeight:600,fontSize:13,marginBottom:8,marginTop:12,color:C.orange}}>SMTP Settings (Outbound)</div>
+                          <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:8,marginBottom:8}}>
+                            <div><Lbl text="SMTP Host"/><input value={ec.smtp_host||""} onChange={e=>setEc("smtp_host",e.target.value)}/></div>
+                            <div><Lbl text="Port"/><input type="number" value={ec.smtp_port||587} onChange={e=>setEc("smtp_port",parseInt(e.target.value))}/></div>
+                            <div><Lbl text="TLS"/><button className="btn sm" style={{marginTop:4,background:ec.smtp_tls!==false?C.grn:"transparent",color:ec.smtp_tls!==false?"#fff":C.t2}} onClick={()=>setEc("smtp_tls",!ec.smtp_tls)}>{ec.smtp_tls!==false?"Yes":"No"}</button></div>
+                          </div>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                            <div><Lbl text="Username"/><input value={ec.smtp_username||""} onChange={e=>setEc("smtp_username",e.target.value)}/></div>
+                            <div><Lbl text="Password"/><input type="password" value={ec.smtp_password||""} onChange={e=>setEc("smtp_password",e.target.value)}/></div>
+                          </div>
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+                            <div><Lbl text="From name"/><input value={ec.smtp_from_name||""} onChange={e=>setEc("smtp_from_name",e.target.value)}/></div>
+                            <div><Lbl text="From email"/><input value={ec.smtp_from_email||""} onChange={e=>setEc("smtp_from_email",e.target.value)}/></div>
+                          </div>
+                        </div>)}
+                        <div style={{display:"flex",gap:8,marginTop:8}}>
+                          <button className="btn btp" disabled={emailCfgSaving} onClick={()=>handleSaveEmailConfig(ec)}>{emailCfgSaving?"Saving\u2026":"Save config"}</button>
+                          <button className="btn" onClick={handleTestEmail}>Send test email</button>
+                        </div>
+                        {emailTestResult && <div style={{marginTop:10,padding:"8px 12px",borderRadius:8,fontSize:13,background:emailTestResult.ok?C.grnBg:C.redBg,color:emailTestResult.ok?C.grnT:C.redT}}>{emailTestResult.msg}</div>}
+                      </div>);
+                    })()}
+                  </Crd>
+                )}
+
+                {/* Email Templates */}
+                {stab==="templates" && (
+                  <Crd>
+                    <div style={{fontWeight:700,fontSize:15,marginBottom:4}}>Auto-Reply Email Templates</div>
+                    <div style={{fontSize:13,color:C.t2,marginBottom:16}}>Configure automatic email responses sent when tickets are created, updated, or resolved.</div>
+                    {emailTplLoading ? <Spinner/> : (
+                      <div>
+                        <div style={{fontSize:12,color:C.t3,marginBottom:12,padding:"8px 12px",background:C.bg,borderRadius:8}}>
+                          <strong>Available variables:</strong> {"{{ticket_id}}, {{title}}, {{classification}}, {{category}}, {{priority}}, {{status}}, {{sla_resolve_time}}, {{sla_response_time}}, {{requester_name}}, {{assignee}}, {{created_at}}, {{portal_url}}"}
+                        </div>
+                        {emailTemplates.map(tpl=>(
+                          <div key={tpl.id} style={{marginBottom:16,padding:16,border:"1px solid "+C.border,borderRadius:8}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                              <div style={{fontWeight:600,fontSize:14}}>{tpl.name}</div>
+                              <Bdg label={tpl.active?"Active":"Inactive"} bg={tpl.active?C.grnBg:C.redBg} fg={tpl.active?C.grnT:C.redT}/>
+                            </div>
+                            {editTpl?.id===tpl.id ? (
+                              <div>
+                                <Lbl text="Subject"/><input style={{marginBottom:8}} value={editTpl.subject||""} onChange={e=>setEditTpl(p=>({...p,subject:e.target.value}))}/>
+                                <Lbl text="Body (HTML)"/><textarea style={{minHeight:120,marginBottom:8,fontFamily:"monospace",fontSize:12}} value={editTpl.body_html||""} onChange={e=>setEditTpl(p=>({...p,body_html:e.target.value}))}/>
+                                <div style={{display:"flex",gap:8}}>
+                                  <button className="btn btp" onClick={()=>{handleUpdateTemplate(editTpl.id,{subject:editTpl.subject,body_html:editTpl.body_html,active:editTpl.active});setEditTpl(null);}}>Save</button>
+                                  <button className="btn" onClick={()=>setEditTpl(null)}>Cancel</button>
+                                  <button className="btn sm" onClick={()=>setEditTpl(p=>({...p,active:!p.active}))}>{editTpl.active?"Disable":"Enable"}</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <div style={{fontSize:12,color:C.t3,marginBottom:4}}>Subject: <span style={{color:C.t1}}>{tpl.subject}</span></div>
+                                <div style={{fontSize:12,color:C.t3,marginBottom:8}}>Body preview: <span style={{color:C.t2}}>{(tpl.body_html||"").replace(/<[^>]*>/g,"").slice(0,100)}\u2026</span></div>
+                                <button className="btn sm" onClick={()=>setEditTpl({...tpl})}>Edit</button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {emailTemplates.length===0 && <div style={{padding:16,textAlign:"center",color:C.t3}}>No templates found. Seed them in Supabase first.</div>}
+                      </div>
+                    )}
+                  </Crd>
+                )}
+
+                {/* Email Log */}
+                {stab==="emaillog" && (
+                  <Crd>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                      <div><div style={{fontWeight:700,fontSize:15}}>Email Audit Log</div><div style={{fontSize:13,color:C.t2}}>Recent inbound and outbound emails processed by the system.</div></div>
+                      <button className="btn sm" onClick={loadEmailLog}>Refresh</button>
+                    </div>
+                    {emailLogLoading ? <Spinner/> : (
+                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                        <thead><tr style={{textAlign:"left",borderBottom:"2px solid "+C.border}}>
+                          <th style={{padding:"6px 8px"}}>Direction</th><th style={{padding:"6px 8px"}}>Ticket</th><th style={{padding:"6px 8px"}}>From</th><th style={{padding:"6px 8px"}}>To</th><th style={{padding:"6px 8px"}}>Subject</th><th style={{padding:"6px 8px"}}>Date</th>
+                        </tr></thead>
+                        <tbody>
+                          {emailLogs.map(l=>(
+                            <tr key={l.id} style={{borderBottom:"1px solid "+C.border}}>
+                              <td style={{padding:"6px 8px"}}><Bdg label={l.direction} bg={l.direction==="inbound"?C.bluBg:C.grnBg} fg={l.direction==="inbound"?C.bluT:C.grnT}/></td>
+                              <td style={{padding:"6px 8px",fontWeight:500,color:C.orange}}>{l.ticket_id||"\u2014"}</td>
+                              <td style={{padding:"6px 8px",color:C.t2}}>{l.from_email}</td>
+                              <td style={{padding:"6px 8px",color:C.t2}}>{l.to_email}</td>
+                              <td style={{padding:"6px 8px",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.subject}</td>
+                              <td style={{padding:"6px 8px",color:C.t3}}>{l.created_at?new Date(l.created_at).toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):"\u2014"}</td>
+                            </tr>
+                          ))}
+                          {emailLogs.length===0 && <tr><td colSpan={6} style={{padding:16,textAlign:"center",color:C.t3}}>No email logs yet</td></tr>}
+                        </tbody>
+                      </table>
+                    )}
                   </Crd>
                 )}
 

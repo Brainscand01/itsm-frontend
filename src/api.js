@@ -200,3 +200,79 @@ export async function apiChangePassword(currentPassword, newPassword) {
   });
   return res.json();
 }
+
+// ── Requesters ─────────────────────────────────────────────
+export async function fetchRequesters() {
+  const res = await fetch(`${base()}/api/requesters`, { headers: headers() });
+  return res.json();
+}
+
+export async function createRequester(body) {
+  const res = await fetch(`${base()}/api/requesters`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
+export async function updateRequester(id, body) {
+  const res = await fetch(`${base()}/api/requesters/${id}`, {
+    method: "PATCH",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
+export async function deleteRequester(id) {
+  const res = await fetch(`${base()}/api/requesters/${id}`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+  return res.json();
+}
+
+// ── Email Config ───────────────────────────────────────────
+export async function fetchEmailConfig() {
+  const res = await fetch(`${base()}/api/email/config`, { headers: headers() });
+  return res.json();
+}
+
+export async function saveEmailConfig(body) {
+  const res = await fetch(`${base()}/api/email/config`, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
+export async function testEmailConnection() {
+  const res = await fetch(`${base()}/api/email/test`, {
+    method: "POST",
+    headers: headers(),
+  });
+  return res.json();
+}
+
+// ── Email Templates ────────────────────────────────────────
+export async function fetchEmailTemplates() {
+  const res = await fetch(`${base()}/api/email/templates`, { headers: headers() });
+  return res.json();
+}
+
+export async function updateEmailTemplate(id, body) {
+  const res = await fetch(`${base()}/api/email/templates/${id}`, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
+// ── Email Log ──────────────────────────────────────────────
+export async function fetchEmailLog() {
+  const res = await fetch(`${base()}/api/email/log`, { headers: headers() });
+  return res.json();
+}
