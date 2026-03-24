@@ -276,3 +276,9 @@ export async function fetchEmailLog() {
   const res = await fetch(`${base()}/api/email/log`, { headers: headers() });
   return res.json();
 }
+
+// ── AI Usage ──────────────────────────────────────────────
+export async function fetchAIUsage() {
+  const res = await fetch(`${base()}/api/ai/usage`, { headers: headers() });
+  return res.json();
+}

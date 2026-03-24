@@ -7,7 +7,7 @@ import {
   apiLogin, apiChangePassword,
   fetchRequesters, createRequester, updateRequester, deleteRequester,
   fetchEmailConfig, saveEmailConfig, testEmailConnection,
-  fetchEmailTemplates, updateEmailTemplate, fetchEmailLog,
+  fetchEmailTemplates, updateEmailTemplate, fetchEmailLog, fetchAIUsage,
 } from './api.js';
 import { isLoggedIn, saveAuth, clearAuth, getUser, logout } from './auth.js';
 
@@ -445,6 +445,8 @@ export default function App() {
   const [emailLogLoading, setEmailLogLoading] = useState(false);
   const [emailTestResult, setEmailTestResult] = useState(null);
   const [showM365Guide, setShowM365Guide] = useState(false);
+  const [aiUsage, setAiUsage] = useState(null);
+  const [aiUsageLoading, setAiUsageLoading] = useState(false);
 
   const chatEnd = useRef(null);
   useEffect(() => { chatEnd.current && chatEnd.current.scrollIntoView({ behavior:"smooth" }); }, [selCh]);
@@ -1658,7 +1660,7 @@ export default function App() {
           {!loading && tab==="settings" && (
             <div style={{display:"grid",gridTemplateColumns:"190px 1fr",gap:16}}>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
-                {[["m365","Integration"],["email","Email Config"],["templates","Email Templates"],["emaillog","Email Log"],["apiconfig","API Config"],["cls","Classifications"],["prio","Priority Types & SLA"],["status","Ticket Statuses"],["bh","Business Hours"],["assign","Auto-Assignment"],["roles","Roles"],["techs","Technicians"]].map(r=>(
+                {[["m365","Integration"],["email","Email Config"],["templates","Email Templates"],["emaillog","Email Log"],["aiusage","AI Usage"],["apiconfig","API Config"],["cls","Classifications"],["prio","Priority Types & SLA"],["status","Ticket Statuses"],["bh","Business Hours"],["assign","Auto-Assignment"],["roles","Roles"],["techs","Technicians"]].map(r=>(
                   <button key={r[0]} className={"stb"+(stab===r[0]?" on":"")} onClick={()=>setStab(r[0])}>{r[1]}</button>
                 ))}
               </div>
@@ -1842,6 +1844,125 @@ export default function App() {
                           {emailLogs.length===0 && <tr><td colSpan={6} style={{padding:16,textAlign:"center",color:C.t3}}>No email logs yet</td></tr>}
                         </tbody>
                       </table>
+                    )}
+                  </Crd>
+                )}
+
+                {/* AI Usage */}
+                {stab==="aiusage" && (
+                  <Crd>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                      <div><div style={{fontWeight:700,fontSize:15}}>AI Usage & Costs</div><div style={{fontSize:13,color:C.t2}}>Monitor AI API consumption, token usage, and estimated costs per department.</div></div>
+                      <button className="btn sm" onClick={async()=>{setAiUsageLoading(true);try{const r=await fetchAIUsage();if(r.data)setAiUsage(r.data);}catch(e){}setAiUsageLoading(false);}}>Refresh</button>
+                    </div>
+                    {aiUsageLoading ? <Spinner/> : !aiUsage ? (
+                      <div style={{textAlign:"center",padding:24,color:C.t3}}>
+                        <div style={{marginBottom:8}}>Click Refresh to load AI usage data.</div>
+                        <button className="btn btp" onClick={async()=>{setAiUsageLoading(true);try{const r=await fetchAIUsage();if(r.data)setAiUsage(r.data);}catch(e){}setAiUsageLoading(false);}}>Load Data</button>
+                      </div>
+                    ) : (
+                      <div>
+                        {/* Summary cards */}
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
+                          {[
+                            ["Total Calls",aiUsage.total_calls,"#"],
+                            ["Input Tokens",aiUsage.total_input_tokens?.toLocaleString(),"tok"],
+                            ["Output Tokens",aiUsage.total_output_tokens?.toLocaleString(),"tok"],
+                            ["Total Cost","$"+aiUsage.total_cost_usd?.toFixed(4),"USD"],
+                          ].map(([label,val,unit])=>(
+                            <div key={label} style={{padding:"14px 16px",background:C.bg,borderRadius:10,textAlign:"center"}}>
+                              <div style={{fontSize:11,color:C.t3,fontWeight:500,marginBottom:4}}>{label}</div>
+                              <div style={{fontSize:20,fontWeight:700,color:C.navy}}>{val}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* By Feature */}
+                        <div style={{marginBottom:20}}>
+                          <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>By Feature</div>
+                          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                            <thead><tr style={{textAlign:"left",borderBottom:"2px solid "+C.border}}>
+                              <th style={{padding:"6px 8px"}}>Feature</th><th style={{padding:"6px 8px"}}>Calls</th><th style={{padding:"6px 8px"}}>Tokens</th><th style={{padding:"6px 8px"}}>Cost (USD)</th>
+                            </tr></thead>
+                            <tbody>
+                              {Object.entries(aiUsage.by_feature||{}).map(([f,d])=>(
+                                <tr key={f} style={{borderBottom:"1px solid "+C.border}}>
+                                  <td style={{padding:"6px 8px",fontWeight:500}}>{f}</td>
+                                  <td style={{padding:"6px 8px"}}>{d.calls}</td>
+                                  <td style={{padding:"6px 8px"}}>{d.tokens?.toLocaleString()}</td>
+                                  <td style={{padding:"6px 8px",fontWeight:500}}>{"$"+d.cost?.toFixed(4)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* By Model */}
+                        <div style={{marginBottom:20}}>
+                          <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>By Model</div>
+                          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                            <thead><tr style={{textAlign:"left",borderBottom:"2px solid "+C.border}}>
+                              <th style={{padding:"6px 8px"}}>Model</th><th style={{padding:"6px 8px"}}>Calls</th><th style={{padding:"6px 8px"}}>Tokens</th><th style={{padding:"6px 8px"}}>Cost (USD)</th>
+                            </tr></thead>
+                            <tbody>
+                              {Object.entries(aiUsage.by_model||{}).map(([m,d])=>(
+                                <tr key={m} style={{borderBottom:"1px solid "+C.border}}>
+                                  <td style={{padding:"6px 8px",fontWeight:500,fontSize:11}}>{m}</td>
+                                  <td style={{padding:"6px 8px"}}>{d.calls}</td>
+                                  <td style={{padding:"6px 8px"}}>{d.tokens?.toLocaleString()}</td>
+                                  <td style={{padding:"6px 8px",fontWeight:500}}>{"$"+d.cost?.toFixed(4)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* By Department */}
+                        {Object.keys(aiUsage.by_department||{}).length > 0 && (
+                          <div style={{marginBottom:20}}>
+                            <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>By Department</div>
+                            <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                              <thead><tr style={{textAlign:"left",borderBottom:"2px solid "+C.border}}>
+                                <th style={{padding:"6px 8px"}}>Department</th><th style={{padding:"6px 8px"}}>Calls</th><th style={{padding:"6px 8px"}}>Tokens</th><th style={{padding:"6px 8px"}}>Cost (USD)</th>
+                              </tr></thead>
+                              <tbody>
+                                {Object.entries(aiUsage.by_department).map(([dept,d])=>(
+                                  <tr key={dept} style={{borderBottom:"1px solid "+C.border}}>
+                                    <td style={{padding:"6px 8px",fontWeight:500}}>{dept}</td>
+                                    <td style={{padding:"6px 8px"}}>{d.calls}</td>
+                                    <td style={{padding:"6px 8px"}}>{d.tokens?.toLocaleString()}</td>
+                                    <td style={{padding:"6px 8px",fontWeight:500}}>{"$"+d.cost?.toFixed(4)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* Recent calls */}
+                        <div>
+                          <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>Recent AI Calls</div>
+                          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                            <thead><tr style={{textAlign:"left",borderBottom:"2px solid "+C.border}}>
+                              <th style={{padding:"6px 8px"}}>Feature</th><th style={{padding:"6px 8px"}}>Model</th><th style={{padding:"6px 8px"}}>Tokens</th><th style={{padding:"6px 8px"}}>Cost</th><th style={{padding:"6px 8px"}}>User</th><th style={{padding:"6px 8px"}}>Ticket</th><th style={{padding:"6px 8px"}}>Time</th>
+                            </tr></thead>
+                            <tbody>
+                              {(aiUsage.recent||[]).map((r,i)=>(
+                                <tr key={i} style={{borderBottom:"1px solid "+C.border}}>
+                                  <td style={{padding:"6px 8px"}}><Bdg label={r.feature} bg={C.bluBg} fg={C.bluT}/></td>
+                                  <td style={{padding:"6px 8px",fontSize:11}}>{r.model}</td>
+                                  <td style={{padding:"6px 8px"}}>{r.tokens?.toLocaleString()}</td>
+                                  <td style={{padding:"6px 8px",fontWeight:500}}>{"$"+r.cost?.toFixed(4)}</td>
+                                  <td style={{padding:"6px 8px",color:C.t2}}>{r.user||"\u2014"}</td>
+                                  <td style={{padding:"6px 8px",color:C.orange,fontWeight:500}}>{r.ticket_id||"\u2014"}</td>
+                                  <td style={{padding:"6px 8px",color:C.t3}}>{r.created_at?new Date(r.created_at).toLocaleString(undefined,{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""}</td>
+                                </tr>
+                              ))}
+                              {(aiUsage.recent||[]).length===0 && <tr><td colSpan={7} style={{padding:16,textAlign:"center",color:C.t3}}>No AI calls logged yet</td></tr>}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
                     )}
                   </Crd>
                 )}
