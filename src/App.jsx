@@ -14,12 +14,14 @@ import { isLoggedIn, saveAuth, clearAuth, getUser, logout } from './auth.js';
 const MODEL = "claude-sonnet-4-20250514";
 
 async function callAI(msgs, sys) {
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST", headers: { "Content-Type": "application/json" },
+  const token = localStorage.getItem("itsm_token") || "";
+  const r = await fetch("https://itsmbackend.vercel.app/api/ai/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
     body: JSON.stringify({ model: MODEL, max_tokens: 1200, system: sys || "", messages: msgs })
   });
   const d = await r.json();
-  return (d.content && d.content[0] && d.content[0].text) || "";
+  return (d.data && d.data.text) || "";
 }
 
 // ── Colours ─────────────────────────────────────────────────
@@ -815,12 +817,13 @@ export default function App() {
   const fetchM365 = async () => {
     setM365L(true);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:MODEL,max_tokens:800,system:"Use Microsoft 365 MCP to get service health. Return ONLY JSON: {services:[{name,status,description}]}.",messages:[{role:"user",content:"Get M365 service health."}],mcp_servers:[{type:"url",url:"https://microsoft365.mcp.claude.com/mcp",name:"m365"}]})});
-      const d = await res.json();
-      const txt = (d.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("");
+      const txt = await callAI(
+        [{role:"user",content:"Get M365 service health."}],
+        "Use Microsoft 365 MCP to get service health. Return ONLY JSON: {services:[{name,status,description}]}."
+      );
       try { setM365H(JSON.parse(txt.replace(/```json|```/g,"").trim())); }
       catch(e) { setM365H({services:[{name:"M365",status:"healthy",description:txt.slice(0,120)}]}); }
-    } catch(e) { setM365H({services:[{name:"M365",status:"warning",description:"Could not reach MCP: "+e.message}]}); }
+    } catch(e) { setM365H({services:[{name:"M365",status:"warning",description:"Could not reach AI: "+e.message}]}); }
     setM365L(false);
   };
   const checkMon = async mon => {
