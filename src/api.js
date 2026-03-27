@@ -175,6 +175,26 @@ export async function fetchAgentPayloads(ticketId) {
   return res.json();
 }
 
+// ── Agent machines ─────────────────────────────────────────
+export async function fetchMachines() {
+  const res = await fetch(`${base()}/api/agent/machines`, { headers: headers() });
+  return res.json();
+}
+
+export async function fetchMachineDetail(machineName) {
+  const res = await fetch(`${base()}/api/agent/machines/${encodeURIComponent(machineName)}`, { headers: headers() });
+  return res.json();
+}
+
+export async function sendAgentCommand(machineName, command, params = {}) {
+  const res = await fetch(`${base()}/api/agent/commands`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ machine_name: machineName, command, params }),
+  });
+  return res.json();
+}
+
 // ── Auth ────────────────────────────────────────────────────
 export async function apiLogin(email, password) {
   const res = await fetch(`${base()}/api/auth/login`, {

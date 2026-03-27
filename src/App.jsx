@@ -8,6 +8,7 @@ import {
   fetchRequesters, createRequester, updateRequester, deleteRequester,
   fetchEmailConfig, saveEmailConfig, testEmailConnection,
   fetchEmailTemplates, updateEmailTemplate, fetchEmailLog, fetchAIUsage,
+  fetchMachines, fetchMachineDetail, sendAgentCommand,
 } from './api.js';
 import { isLoggedIn, saveAuth, clearAuth, getUser, logout } from './auth.js';
 
@@ -139,7 +140,7 @@ const SCRIPTS = [
 const WEEK = [{l:"Mon",v:8},{l:"Tue",v:12},{l:"Wed",v:6},{l:"Thu",v:15},{l:"Fri",v:9},{l:"Sat",v:2},{l:"Sun",v:1}];
 const NAV = [
   {id:"dashboard",label:"Dashboard"},{id:"tickets",label:"Tickets"},{id:"create",label:"New Ticket"},
-  {id:"teams",label:"Teams Chat"},{id:"reports",label:"Reports"},{id:"health",label:"System Health"},
+  {id:"machines",label:"Machines"},{id:"teams",label:"Teams Chat"},{id:"reports",label:"Reports"},{id:"health",label:"System Health"},
   {id:"logs",label:"Log Analyser"},{id:"scripts",label:"Self-Heal"},{id:"kb",label:"Knowledge Base"},
   {id:"users",label:"Users"},{id:"settings",label:"Settings"},
 ];
@@ -237,6 +238,7 @@ function NavIcon({ id }) {
   if (id==="create")    return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M9 6v6M6 9h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
   if (id==="teams")     return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 4h12a1 1 0 011 1v7a1 1 0 01-1 1H6l-3 2V5a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>;
   if (id==="reports")   return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 14V8l3-3 3 3 3-4 3 4v6H3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>;
+  if (id==="machines")  return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="3" width="14" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><path d="M6 15h6M9 12v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
   if (id==="health")    return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 9h3l2-4 3 8 2-4h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
   if (id==="logs")      return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M5 6h8M5 9h5M5 12h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
   if (id==="scripts")   return <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2l1.5 3.5L14 6.5l-2.5 2.5.5 3.5L9 11l-3 1.5.5-3.5L4 6.5l3.5-.5L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>;
@@ -400,6 +402,13 @@ export default function App() {
   const [apiError, setApiError] = useState(null);
   const [backendHealth, setBackendHealth] = useState(null);
   const [agentData, setAgentData] = useState(null);
+  const [machines, setMachines] = useState([]);
+  const [machinesLoading, setMachinesLoading] = useState(false);
+  const [selMachine, setSelMachine] = useState(null);
+  const [machineDetail, setMachineDetail] = useState(null);
+  const [machineDetailLoading, setMachineDetailLoading] = useState(false);
+  const [cmdSending, setCmdSending] = useState(null);
+  const [machineSearch, setMachineSearch] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   // API Config state
@@ -594,7 +603,40 @@ export default function App() {
     setNoteSaving(false);
   };
 
-  const navTo = id => { setTab(id); setSelTk(null); setSelCh(null); };
+  const navTo = id => {
+    setTab(id); setSelTk(null); setSelCh(null);
+    if (id === "machines") loadMachines();
+  };
+
+  const loadMachines = async () => {
+    setMachinesLoading(true);
+    try {
+      const res = await fetchMachines();
+      if (res.data) setMachines(res.data);
+    } catch (e) { console.error("Failed to load machines", e); }
+    setMachinesLoading(false);
+  };
+
+  const loadMachineDetail = async (name) => {
+    setSelMachine(name);
+    setMachineDetailLoading(true);
+    try {
+      const res = await fetchMachineDetail(name);
+      if (res.data) setMachineDetail(res.data);
+    } catch (e) { console.error("Failed to load machine detail", e); }
+    setMachineDetailLoading(false);
+  };
+
+  const runCommand = async (machineName, command) => {
+    setCmdSending(command);
+    try {
+      await sendAgentCommand(machineName, command);
+      setCmdSending(null);
+    } catch (e) {
+      console.error("Command failed", e);
+      setCmdSending(null);
+    }
+  };
 
   // ── Requesters load ──────────────────────────────────────
   const loadRequesters = async () => {
@@ -1345,6 +1387,200 @@ export default function App() {
                 ? <Crd xstyle={{borderTop:"3px solid "+C.orange}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><HexLogo size={22}/><span style={{fontWeight:700,fontSize:14}}>AI Insights</span></div><div style={{fontSize:13,lineHeight:1.9,whiteSpace:"pre-wrap"}}>{repTxt}</div></Crd>
                 : <Crd xstyle={{display:"flex",alignItems:"center",justifyContent:"center",padding:"2.5rem",color:C.t3,fontSize:14}}>Click &quot;Generate AI insights&quot; to analyse your ticket data</Crd>
               }
+            </div>
+          )}
+
+          {/* ── MACHINES DASHBOARD ── */}
+          {!loading && tab==="machines" && (
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+                <div>
+                  <div style={{fontWeight:700,fontSize:16,marginBottom:4}}>Machines</div>
+                  <div style={{fontSize:13,color:C.t2}}>Desktop agent fleet — online status, health, and remote commands.</div>
+                </div>
+                <button className="btn btp sm" onClick={loadMachines}>{machinesLoading ? "Refreshing..." : "Refresh"}</button>
+              </div>
+
+              {/* Summary cards */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:20}}>
+                <Met label="Total Machines" value={machines.length} color={C.t1}/>
+                <Met label="Online" value={machines.filter(m=>m.online).length} color={C.grn}/>
+                <Met label="Offline" value={machines.filter(m=>!m.online).length} color={machines.filter(m=>!m.online).length>0?C.red:C.t3}/>
+                <Met label="Critical" value={machines.filter(m=>m.status==="critical").length} color={machines.filter(m=>m.status==="critical").length>0?C.red:C.t3}/>
+                <Met label="Warning" value={machines.filter(m=>m.status==="warning").length} color={machines.filter(m=>m.status==="warning").length>0?C.yel:C.t3}/>
+              </div>
+
+              {/* Search */}
+              <div style={{marginBottom:16}}>
+                <input
+                  placeholder="Search machines..."
+                  value={machineSearch}
+                  onChange={e=>setMachineSearch(e.target.value)}
+                  style={{width:"100%",maxWidth:400,padding:"8px 12px",border:"1px solid "+C.border,borderRadius:8,fontSize:13,background:C.card}}
+                />
+              </div>
+
+              {/* Machine detail panel */}
+              {selMachine && machineDetail && (
+                <Crd xstyle={{marginBottom:20,borderLeft:"4px solid "+C.orange}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:15}}>{selMachine}</div>
+                      <div style={{fontSize:12,color:C.t2,marginTop:2}}>
+                        {machineDetail.payload?.ip_address || "—"} · {machineDetail.payload?.username || "—"} · Agent v{machineDetail.heartbeats?.[0]?.agent_version || "?"}
+                      </div>
+                    </div>
+                    <button className="btn sm" style={{fontSize:11}} onClick={()=>{setSelMachine(null);setMachineDetail(null);}}>Close</button>
+                  </div>
+
+                  {machineDetailLoading ? <div style={{color:C.t3}}>Loading...</div> : (
+                    <div>
+                      {/* Hardware info */}
+                      {machineDetail.payload && (
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10,marginBottom:16}}>
+                          {machineDetail.payload.os_info && (
+                            <div style={{padding:"8px 12px",background:C.bg,borderRadius:8}}>
+                              <div style={{fontSize:11,color:C.t3,marginBottom:2}}>OS</div>
+                              <div style={{fontSize:12,fontWeight:500}}>{typeof machineDetail.payload.os_info === "object" ? machineDetail.payload.os_info.platform : machineDetail.payload.os_info}</div>
+                            </div>
+                          )}
+                          {machineDetail.payload.hardware_info?.cpu && (
+                            <div style={{padding:"8px 12px",background:C.bg,borderRadius:8}}>
+                              <div style={{fontSize:11,color:C.t3,marginBottom:2}}>CPU</div>
+                              <div style={{fontSize:12,fontWeight:500}}>{machineDetail.payload.hardware_info.cpu.model || "—"}</div>
+                              <div style={{fontSize:11,color:C.t2}}>{machineDetail.payload.hardware_info.cpu.usage_percent || 0}% usage</div>
+                            </div>
+                          )}
+                          {machineDetail.payload.hardware_info?.memory && (
+                            <div style={{padding:"8px 12px",background:C.bg,borderRadius:8}}>
+                              <div style={{fontSize:11,color:C.t3,marginBottom:2}}>Memory</div>
+                              <div style={{fontSize:12,fontWeight:500}}>{machineDetail.payload.hardware_info.memory.total_gb || "?"} GB</div>
+                              <div style={{fontSize:11,color:machineDetail.payload.hardware_info.memory.percent>85?C.red:C.t2}}>{machineDetail.payload.hardware_info.memory.percent || 0}% used</div>
+                            </div>
+                          )}
+                          {machineDetail.payload.disk_info?.disks?.[0] && (
+                            <div style={{padding:"8px 12px",background:C.bg,borderRadius:8}}>
+                              <div style={{fontSize:11,color:C.t3,marginBottom:2}}>Disk {machineDetail.payload.disk_info.disks[0].mountpoint}</div>
+                              <div style={{fontSize:12,fontWeight:500}}>{machineDetail.payload.disk_info.disks[0].total_gb || "?"} GB</div>
+                              <div style={{fontSize:11,color:machineDetail.payload.disk_info.disks[0].percent>90?C.red:C.t2}}>{machineDetail.payload.disk_info.disks[0].percent || 0}% used · {machineDetail.payload.disk_info.disks[0].free_gb || 0} GB free</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Remote commands */}
+                      <div style={{marginBottom:16}}>
+                        <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>Remote Commands</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                          {[
+                            {cmd:"collect_full_snapshot", label:"Full Snapshot", desc:"Collect all machine data"},
+                            {cmd:"flush_dns", label:"Flush DNS", desc:"Clear DNS cache"},
+                            {cmd:"restart_spooler", label:"Restart Spooler", desc:"Restart print spooler"},
+                            {cmd:"disk_cleanup", label:"Disk Cleanup", desc:"Run Windows disk cleanup"},
+                            {cmd:"clear_temp", label:"Clear Temp", desc:"Delete temp files"},
+                            {cmd:"check_updates", label:"Check Updates", desc:"Check Windows updates"},
+                          ].map(c => (
+                            <button
+                              key={c.cmd}
+                              className="btn sm"
+                              title={c.desc}
+                              disabled={cmdSending===c.cmd}
+                              onClick={()=>runCommand(selMachine, c.cmd)}
+                              style={{fontSize:11,padding:"5px 12px"}}
+                            >{cmdSending===c.cmd ? "Sending..." : c.label}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Recent heartbeats */}
+                      {machineDetail.heartbeats?.length > 0 && (
+                        <div>
+                          <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>Recent Heartbeats</div>
+                          <div style={{maxHeight:200,overflow:"auto"}}>
+                            <table style={{width:"100%",fontSize:12,borderCollapse:"collapse"}}>
+                              <thead><tr style={{borderBottom:"2px solid "+C.border}}>
+                                <th style={{textAlign:"left",padding:"6px 8px",color:C.t3,fontWeight:600}}>Time</th>
+                                <th style={{textAlign:"left",padding:"6px 8px",color:C.t3,fontWeight:600}}>Status</th>
+                                <th style={{textAlign:"left",padding:"6px 8px",color:C.t3,fontWeight:600}}>CPU</th>
+                                <th style={{textAlign:"left",padding:"6px 8px",color:C.t3,fontWeight:600}}>RAM</th>
+                                <th style={{textAlign:"left",padding:"6px 8px",color:C.t3,fontWeight:600}}>Disk</th>
+                              </tr></thead>
+                              <tbody>
+                                {machineDetail.heartbeats.map((hb,i) => {
+                                  const meta = hb.metadata || {};
+                                  return (
+                                    <tr key={i} style={{borderBottom:"1px solid "+C.border}}>
+                                      <td style={{padding:"6px 8px",color:C.t2}}>{hb.created_at ? new Date(hb.created_at).toLocaleString() : "—"}</td>
+                                      <td style={{padding:"6px 8px"}}><Bdg label={hb.status || "?"} bg={hb.status==="online"||hb.status==="healthy"?C.grnBg:hb.status==="warning"?C.yelBg:hb.status==="critical"?C.redBg:C.neu} fg={hb.status==="online"||hb.status==="healthy"?C.grnT:hb.status==="warning"?C.yelT:hb.status==="critical"?C.redT:C.t2}/></td>
+                                      <td style={{padding:"6px 8px",color:meta.cpu_percent>85?C.red:C.t1}}>{meta.cpu_percent != null ? meta.cpu_percent+"%" : "—"}</td>
+                                      <td style={{padding:"6px 8px",color:meta.ram_percent>85?C.red:C.t1}}>{meta.ram_percent != null ? meta.ram_percent+"%" : "—"}</td>
+                                      <td style={{padding:"6px 8px",color:meta.disk_percent>90?C.red:C.t1}}>{meta.disk_percent != null ? meta.disk_percent+"%" : "—"}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Crd>
+              )}
+
+              {/* Machine list */}
+              {machinesLoading ? (
+                <div style={{textAlign:"center",padding:40,color:C.t3}}>Loading machines...</div>
+              ) : machines.length === 0 ? (
+                <Crd xstyle={{textAlign:"center",padding:"40px 20px"}}>
+                  <div style={{fontSize:14,color:C.t2,marginBottom:8}}>No machines connected</div>
+                  <div style={{fontSize:12,color:C.t3}}>Install the Desktop Agent on your machines to see them here.</div>
+                </Crd>
+              ) : (
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",gap:12}}>
+                  {machines
+                    .filter(m => !machineSearch || m.machine_name?.toLowerCase().includes(machineSearch.toLowerCase()) || m.username?.toLowerCase().includes(machineSearch.toLowerCase()) || m.ip_address?.toLowerCase().includes(machineSearch.toLowerCase()))
+                    .map(m => {
+                    const meta = m.metadata || {};
+                    const statusColor = m.online ? (m.status==="critical"?C.red:m.status==="warning"?C.yel:C.grn) : C.t3;
+                    const statusBg = m.online ? (m.status==="critical"?C.redBg:m.status==="warning"?C.yelBg:C.grnBg) : C.neu;
+                    return (
+                      <Crd key={m.machine_name} xstyle={{borderLeft:"3px solid "+statusColor,cursor:"pointer",transition:"box-shadow 0.15s"}} >
+                        <div onClick={()=>loadMachineDetail(m.machine_name)} style={{cursor:"pointer"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                            <div>
+                              <div style={{fontWeight:600,fontSize:14}}>{m.machine_name}</div>
+                              <div style={{fontSize:12,color:C.t2,marginTop:2}}>{m.username || "—"} · {m.ip_address || "—"}</div>
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:6}}>
+                              <div style={{width:8,height:8,borderRadius:"50%",background:statusColor}}/>
+                              <Bdg label={m.online?"Online":"Offline"} bg={statusBg} fg={statusColor}/>
+                            </div>
+                          </div>
+                          {/* Quick metrics */}
+                          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:4}}>
+                            <div style={{background:C.bg,borderRadius:6,padding:"6px 8px",textAlign:"center"}}>
+                              <div style={{fontSize:10,color:C.t3}}>CPU</div>
+                              <div style={{fontSize:14,fontWeight:600,color:meta.cpu_percent>85?C.red:C.t1}}>{meta.cpu_percent != null ? meta.cpu_percent+"%" : "—"}</div>
+                            </div>
+                            <div style={{background:C.bg,borderRadius:6,padding:"6px 8px",textAlign:"center"}}>
+                              <div style={{fontSize:10,color:C.t3}}>RAM</div>
+                              <div style={{fontSize:14,fontWeight:600,color:meta.ram_percent>85?C.red:C.t1}}>{meta.ram_percent != null ? meta.ram_percent+"%" : "—"}</div>
+                            </div>
+                            <div style={{background:C.bg,borderRadius:6,padding:"6px 8px",textAlign:"center"}}>
+                              <div style={{fontSize:10,color:C.t3}}>Disk</div>
+                              <div style={{fontSize:14,fontWeight:600,color:meta.disk_percent>90?C.red:C.t1}}>{meta.disk_percent != null ? meta.disk_percent+"%" : "—"}</div>
+                            </div>
+                          </div>
+                          <div style={{fontSize:11,color:C.t3,marginTop:8}}>
+                            {m.agent_version ? "Agent v"+m.agent_version+" · " : ""}{m.os_version ? m.os_version.slice(0,30) : ""}{m.last_seen_minutes_ago != null ? " · Last seen "+m.last_seen_minutes_ago+"m ago" : ""}
+                          </div>
+                        </div>
+                      </Crd>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
