@@ -11,7 +11,7 @@ function getConfig() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return JSON.parse(stored);
   } catch (e) { /* ignore */ }
-  return { baseUrl: "https://itsmbackend.vercel.app", apiKey: "OlO9agvGA2" };
+  return { baseUrl: "https://itsm-backend-delta.vercel.app", apiKey: "OlO9agvGA2" };
 }
 
 export function saveConfig(cfg) {
