@@ -1,5 +1,5 @@
 // ── ITSM Backend API Service Layer ──────────────────────────
-// Backend: https://itsmbackend.vercel.app
+// Backend: https://itsm-backend-delta.vercel.app
 // API Key: OlO9agvGA2
 
 import { getToken } from "./auth";

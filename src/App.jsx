@@ -16,7 +16,7 @@ const MODEL = "claude-haiku-4-5-20251001";
 
 async function callAI(msgs, sys) {
   const token = (() => { try { const d = JSON.parse(localStorage.getItem("itsm_auth") || "null"); return d?.token || ""; } catch { return ""; } })();
-  const r = await fetch("https://itsmbackend.vercel.app/api/ai/chat", {
+  const r = await fetch("https://itsm-backend-delta.vercel.app/api/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
     body: JSON.stringify({ model: MODEL, max_tokens: 1200, system: sys || "", messages: msgs })

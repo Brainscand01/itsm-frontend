@@ -1,0 +1,5 @@
+Tenant
+a0ca85cb-1f96-4e1a-b91d-afcb34872818
+Client/Application ID
+75f8c4b9-5807-43e4-8dd5-306dd3b111fb
+Secret
